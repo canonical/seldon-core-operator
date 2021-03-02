@@ -28,9 +28,9 @@ jobs:
         echo $CHARMSTORE_CREDENTIAL > ~/.go-cookies
         IMAGE_TAG="1.6.0"
         charmcraft build
-        docker pull docker.io/seldonio/seldon-core-operator:1.6.0:$IMAGE_TAG
+        docker pull docker.io/seldonio/seldon-core-operator:$IMAGE_TAG
         charm push ./seldon-controller-manager.charm \
             cs:~seldon-charmers/seldon-controller-manager \
-            --resource oci-image=docker.io/seldonio/seldon-core-operator:1.6.0:$IMAGE_TAG
+            --resource oci-image=docker.io/seldonio/seldon-core-operator:$IMAGE_TAG
 
 
