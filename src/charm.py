@@ -319,6 +319,35 @@ class SeldonCoreCharm(CharmBase):
                                     "resources": ["services/status"],
                                     "verbs": ["get", "patch", "update"],
                                 },
+                                {
+                                    "apiGroups": ["apiextensions.k8s.io"],
+                                    "resources": ["customresourcedefinitions"],
+                                    "verbs": ["create", "get", "list"],
+                                },
+                                {
+                                    "apiGroups": ["admissionregistration.k8s.io"],
+                                    "resources": ["validatingwebhookconfigurations"],
+                                    "verbs": [
+                                        "get",
+                                        "list",
+                                        "create",
+                                        "delete",
+                                        "update",
+                                    ],
+                                },
+                                {
+                                    "apiGroups": [""],
+                                    "resources": ["configmaps"],
+                                    "verbs": [
+                                        "get",
+                                        "list",
+                                        "watch",
+                                        "create",
+                                        "update",
+                                        "patch",
+                                        "delete",
+                                    ],
+                                },
                             ],
                         }
                     ]
