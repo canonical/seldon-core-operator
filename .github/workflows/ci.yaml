@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        set -eux
+        sudo apt install python3-setuptools
+        sudo pip3 install black flake8
+
+    - name: Check black
+      run: black --check .
+
+    - name: Check flake8
+      run: flake8
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@v2
+
+    - uses: balchua/microk8s-actions@v0.2.2
+      with:
+        addons: '["dns", "storage", "rbac"]'
+
+    - name: Install dependencies
+      run: |
+        set -eux
+        sudo pip3 install charmcraft
+        sudo snap install juju --classic
+        sudo snap install juju-wait --classic
+
+    - name: Bootstrap Juju
+      run: |
+        set -eux
+        sg microk8s -c 'juju bootstrap microk8s uk8s'
+        juju add-model seldon
+
+    - name: Deploy charm
+      run: |
+        set -eux
+        charmcraft build
+        juju deploy ./seldon-controller-manager.charm \
+          --resource oci-image=docker.io/seldonio/seldon-core-operator:1.6.0
+        juju wait -wvt 300
+        juju status
+
+    - name: Test charm
+      run: |
+        set -eux
+        kubectl apply -f examples/serve-simple-v1alpha2.yml
+
+    - name: Get all
+      run: kubectl get all -A
+      if: failure()
+
+    - name: Get juju status
+      run: juju status
+      if: failure()
+
+    - name: Get workload logs
+      run: kubectl logs --tail 100 -nseldon -ljuju-app=seldon-controller-manager
+      if: failure()
+
+    - name: Get operator logs
+      run: kubectl logs --tail 100 -nseldon -ljuju-operator=seldon-controller-manager
+      if: failure()
+

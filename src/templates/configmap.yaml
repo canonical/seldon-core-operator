@@ -1,0 +1,93 @@
+apiVersion: v1
+data:
+  credentials: |-
+    {
+       "gcs" : {
+           "gcsCredentialFileName": "gcloud-application-credentials.json"
+       },
+       "s3" : {
+           "s3AccessKeyIDName": "awsAccessKeyID",
+           "s3SecretAccessKeyName": "awsSecretAccessKey"
+       }
+    }
+  explainer: |-
+    {
+        "image" : "seldonio/alibiexplainer:1.1.1-SNAPSHOT"
+    }
+  predictor_servers: |-
+    {
+        "TENSORFLOW_SERVER": {
+          "protocols" : {
+            "tensorflow": {
+              "image": "tensorflow/serving",
+              "defaultImageVersion": "2.1.0"
+              },
+            "seldon": {
+              "image": "seldonio/tfserving-proxy",
+              "defaultImageVersion": "1.6.0"
+              }
+            }
+        },
+        "SKLEARN_SERVER": {
+          "protocols" : {
+            "seldon": {
+              "image": "seldonio/sklearnserver",
+              "defaultImageVersion": "1.6.0"
+              },
+            "kfserving": {
+              "image": "seldonio/mlserver",
+              "defaultImageVersion": "0.1.0"
+              }
+            }
+        },
+        "XGBOOST_SERVER": {
+          "protocols" : {
+            "seldon": {
+              "image": "seldonio/xgboostserver",
+              "defaultImageVersion": "1.6.0"
+              },
+            "kfserving": {
+              "image": "seldonio/mlserver",
+              "defaultImageVersion": "0.1.0"
+              }
+            }
+        },
+        "MLFLOW_SERVER": {
+          "protocols" : {
+            "seldon": {
+              "image": "seldonio/mlflowserver",
+              "defaultImageVersion": "1.6.0"
+              },
+            "kfserving": {
+              "image": "seldonio/mlserver",
+              "defaultImageVersion": "0.1.0"
+              }
+            }
+        },
+        "TRITON_SERVER": {
+          "protocols" : {
+            "kfserving": {
+              "image": "nvcr.io/nvidia/tritonserver",
+              "defaultImageVersion": "20.08-py3"
+              }
+            }
+        }
+    }
+  storageInitializer: |-
+    {
+        "image" : "gcr.io/kfserving/storage-initializer:v0.4.0",
+        "memoryRequest": "100Mi",
+        "memoryLimit": "1Gi",
+        "cpuRequest": "100m",
+        "cpuLimit": "1"
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: seldon
+    app.kubernetes.io/instance: seldon1
+    app.kubernetes.io/name: seldon
+    app.kubernetes.io/version: v0.5
+    control-plane: seldon-controller-manager
+  name: seldon-config
+  namespace: seldon-system
