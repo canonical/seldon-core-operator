@@ -1,5 +1,5 @@
-name: seldon-controller-manager
-display-name: Seldon Controller Manager
+name: seldon-core
+display-name: Seldon Core
 summary: Blazing Fast, Industry-Ready ML
 description: |
   An open source platform to deploy your machine learning models
@@ -20,7 +20,4 @@ requires:
     interface: service-mesh
   keda:
     interface: autoscaling
-  s3:
-    interface: s3
-    limit: 1
 min-juju-version: 2.8.6
