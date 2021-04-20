@@ -18,6 +18,7 @@ jobs:
       run: |
         set -eux
         sudo snap install charm --classic
+        sudo snap install yq
         sudo pip3 install charmcraft
 
     - name: Publish charm
