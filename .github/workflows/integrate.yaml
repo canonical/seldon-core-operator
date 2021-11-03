@@ -96,10 +96,10 @@ jobs:
       if: failure()
 
     - name: Get workload logs
-      run: kubectl logs --tail 100 -nci-test -ljuju-app=seldon-controller-manager
+      run: kubectl logs --tail 100 -nci-test -lapp.kubernetes.io/name=seldon-controller-manager
       if: failure()
 
     - name: Get operator logs
-      run: kubectl logs --tail 100 -nci-test -ljuju-operator=seldon-controller-manager
+      run: kubectl logs --tail 100 -nci-test -loperator.juju.is/name=seldon-controller-manager
       if: failure()
 

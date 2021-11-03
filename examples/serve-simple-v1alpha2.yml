@@ -3,7 +3,7 @@ kind: "SeldonDeployment"
 metadata:
   labels:
     app: "seldon"
-  name: mock-classifier
+  name: mock-classifier-dummy
 spec:
   annotations:
     deployment_version: "v1"
