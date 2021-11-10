@@ -2,14 +2,14 @@ apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: seldon-system/seldon-serving-cert
+    cert-manager.io/inject-ca-from: kubeflow/seldon-serving-cert
   creationTimestamp: null
   labels:
     app: seldon
-    app.kubernetes.io/instance: seldon1
-    app.kubernetes.io/name: seldon
-    app.kubernetes.io/version: v0.5
-  name: seldon-validating-webhook-configuration
+    app.kubernetes.io/instance: 'seldon-core'
+    app.kubernetes.io/name: 'seldon-core-operator'
+    app.kubernetes.io/version: '1.9.0'
+  name: seldon-validating-webhook-configuration-kubeflow
 webhooks:
 - clientConfig:
     caBundle: Cg==
@@ -24,10 +24,8 @@ webhooks:
     matchExpressions:
     - key: seldon.io/controller-id
       operator: DoesNotExist
-  objectSelector:
-    matchExpressions:
-    - key: seldon.io/controller-id
-      operator: DoesNotExist
+    matchLabels:
+      serving.kubeflow.org/inferenceservice: enabled
   rules:
   - apiGroups:
     - machinelearning.seldon.io
@@ -43,8 +41,8 @@ webhooks:
     caBundle: Cg==
     service:
       name: seldon-webhook-service
-      namespace: {{ namespace }}
       port: {{ webhook_port }}
+      namespace: {{ namespace }}
       path: /validate-machinelearning-seldon-io-v1alpha2-seldondeployment
   failurePolicy: Fail
   name: v1alpha2.vseldondeployment.kb.io
@@ -52,10 +50,8 @@ webhooks:
     matchExpressions:
     - key: seldon.io/controller-id
       operator: DoesNotExist
-  objectSelector:
-    matchExpressions:
-    - key: seldon.io/controller-id
-      operator: DoesNotExist
+    matchLabels:
+      serving.kubeflow.org/inferenceservice: enabled
   rules:
   - apiGroups:
     - machinelearning.seldon.io
@@ -80,10 +76,8 @@ webhooks:
     matchExpressions:
     - key: seldon.io/controller-id
       operator: DoesNotExist
-  objectSelector:
-    matchExpressions:
-    - key: seldon.io/controller-id
-      operator: DoesNotExist
+    matchLabels:
+      serving.kubeflow.org/inferenceservice: enabled
   rules:
   - apiGroups:
     - machinelearning.seldon.io
