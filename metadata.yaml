@@ -1,5 +1,4 @@
 name: seldon-core
-display-name: Seldon Core
 summary: Blazing Fast, Industry-Ready ML
 description: |
   An open source platform to deploy your machine learning models

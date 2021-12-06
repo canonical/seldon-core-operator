@@ -4,40 +4,25 @@ on:
   push:
     branches:
       - master
+      - main
+      - track/**
+  pull_request:
+    branches:
+      - master
+      - main
+      - track/**
 
 jobs:
-  charm:
-    name: Charm
+  publish-charm:
+    name: Publish Charm
     runs-on: ubuntu-latest
-
+    # Only publish to charmhub if we are pushing to a special branch or running PRs from something named `branch/*`
+    if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: Install dependencies
-      run: |
-        set -eux
-        sudo snap install charm --classic
-        sudo snap install yq
-        sudo pip3 install charmcraft
-
-    - name: Publish charm
-      env:
-        CHARMSTORE_CREDENTIAL: ${{ secrets.CHARMSTORE_CREDENTIAL }}
-      run: |
-        set -eux
-        echo $CHARMSTORE_CREDENTIAL > ~/.go-cookies
-
-        CS_URL="cs:~seldon-charmers/seldon-core"
-
-        IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
-        charmcraft build
-        docker pull $IMAGE
-        charm push ./*.charm $CS_URL --resource oci-image=$IMAGE
-
-        REVISION=$(charm show $CS_URL --channel unpublished --format yaml | yq e .id-revision.Revision -)
-        OCI_VERSION=$(charm list-resources $CS_URL --format yaml --channel unpublished | yq e .0.revision -)
-        charm release \
-            --channel edge \
-            --resource oci-image-$OCI_VERSION \
-            $CS_URL-$REVISION
+      - uses: actions/checkout@v2
+      # TODO: Update to @main when https://github.com/canonical/charmhub-upload-action/pull/3 merged
+      - uses: canonical/charmhub-upload-action@branch/upload-charm-revisions
+        with:
+          credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+          charm-path: ./
+          charmcraft-channel: latest/edge
