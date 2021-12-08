@@ -20,8 +20,7 @@ jobs:
     if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
       - uses: actions/checkout@v2
-      # TODO: Update to @main when https://github.com/canonical/charmhub-upload-action/pull/3 merged
-      - uses: canonical/charmhub-upload-action@branch/upload-charm-revisions
+      - uses: canonical/charmhub-upload-action@v0.2.0
         with:
           credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
           charm-path: ./
