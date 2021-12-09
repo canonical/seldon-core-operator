@@ -20,7 +20,7 @@ jobs:
     if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
       - uses: actions/checkout@v2
-      - uses: canonical/charmhub-upload-action@v0.2.0
+      - uses: canonical/charmhub-upload-action@0.2.0
         with:
           credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
           charm-path: ./
