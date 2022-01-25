@@ -1,4 +1,19 @@
 ## Seldon Core Operator - a component of the Charmed Kubeflow distribution from Canonical
+
+This repository hosts the Kubernetes Python Operator for Seldon Core
+(see [CharmHub](https://charmhub.io/?q=seldon-core)).
+
+The Seldon Core Operator is a Python script that wraps the latest released Seldon Core manifest, providing lifecycle management and handling events (install, upgrade, integrate, remove).
+
+### Usage
+
+The Seldon Core Operator may be deployed using the Juju command line as
+in
+
+```sh
+$ juju deploy seldon-core
+```
+
 ## Looking for a fully supported platform for MLOps?
 
 Canonical [Charmed Kubeflow](https://charmed-kubeflow.io) is a state of the art, fully supported MLOps platform that helps data scientists collaborate on AI innovation on any cloud from concept to production, offered by Canonical - the publishers of [Ubuntu](https://ubuntu.com).
@@ -23,12 +38,12 @@ Learn more about deploying and using Charmed Kubeflow at [https://charmed-kubefl
 * NVIDIA GPU support: **accelerate deep learning model training**
 * Apache Spark integration: **empower big data driven model training**
 * Ideation to production: **automate model training & deployment**
-* AutoML: **Hyperparameter tuning, architecture search**
+* AutoML: **hyperparameter tuning, architecture search**
 * Composable: **edge deployment configurations available**
 
 <br/>
 
-### What’s included in Charmed Kubeflow 1.3
+### What’s included in Charmed Kubeflow 1.4
 * LDAP Authentication
 * Jupyter Notebooks
 * Work with Python and R
@@ -49,13 +64,6 @@ Learn more about deploying and using Charmed Kubeflow at [https://charmed-kubefl
 
 <br/>
 
-This repository hosts the Kubernetes Python Operator for Seldon Core
-(see [CharmHub](https://charmhub.io/?q=seldon-core)).
-
-The Seldon Core Operator is a Python script that wraps the latest released Seldon Core manifest, providing lifecycle management and handling events (install, upgrade, integrate, remove).
-
-<br/>
-
 ### Documentation
 Please see the [official docs site](https://charmed-kubeflow.io/docs) for complete documentation of the Charmed Kubeflow distribution.
 
@@ -66,13 +74,12 @@ If you find a bug in our operator or want to request a specific feature, please 
 <br/>
 
 ### License
-Charmed Kubeflow is free software, distributed under the [Apache Software License, version 2](https://github.com/canonical/seldon-core-operator/blob/master/LICENSE).
+Charmed Kubeflow is free software, distributed under the [Apache Software License, version 2.0](https://github.com/canonical/seldon-core-operator/blob/master/LICENSE).
 
 <br/>
 
 ### Contributing
-Canonical welcomes contributions to Charmed Kubeflow. Please check out our contributing guide if you're interested in contributing to the distribution.
-
+Canonical welcomes contributions to Charmed Kubeflow. Please check out our [contributor agreement](https://ubuntu.com/legal/contributors) if you're interested in contributing to the distribution.
 <br/>
 
 ### Security
