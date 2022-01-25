@@ -17,3 +17,8 @@ requires:
     interface: service-mesh
   keda:
     interface: autoscaling
+provides:
+  monitoring:
+    interface: prometheus_scrape
+  grafana-dashboard:
+    interface: grafana_dashboard
