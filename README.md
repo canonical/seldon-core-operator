@@ -11,7 +11,7 @@ The Seldon Core Operator may be deployed using the Juju command line as
 follows
 
 ```sh
-$ juju deploy seldon-core
+$ juju deploy seldon-core seldon-controller-manager
 ```
 
 ## Looking for a fully supported platform for MLOps?
