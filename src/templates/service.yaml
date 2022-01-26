@@ -13,4 +13,3 @@ spec:
     targetPort: {{ webhook_port }}
   selector:
     app.kubernetes.io/name: {{ service }}
-    control-plane: seldon-controller-manager
