@@ -49,8 +49,6 @@ jobs:
 
     - name: Run integration tests
       run: tox -vve integration -- --model testing
-      env:
-        KUBECONFIG: /home/runner/.kube/config
 
     # On failure, capture debugging resources
     - name: Get all
