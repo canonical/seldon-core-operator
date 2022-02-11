@@ -41,6 +41,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
 
     this_ns = client.get(res=Namespace, name=namespace)
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
+    client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
     SeldonDeployment = create_namespaced_resource(
         group="machinelearning.seldon.io",
