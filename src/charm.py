@@ -53,6 +53,12 @@ class Operator(CharmBase):
         env = Environment(
             loader=FileSystemLoader("src/templates/"),
         )
+
+        if config["istio-gateway"] != "":
+            istio_enabled = "true"
+        else:
+            istio_enabled = "false"
+
         envs = {
             "AMBASSADOR_ENABLED": str(bool(self.model.relations["ambassador"])).lower(),
             "AMBASSADOR_SINGLE_NAMESPACE": str(
@@ -104,7 +110,7 @@ class Operator(CharmBase):
                 "executor-server-metrics-port-name"
             ],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
-            "ISTIO_ENABLED": str(bool(self.model.relations["istio"])).lower(),
+            "ISTIO_ENABLED": istio_enabled,
             "ISTIO_GATEWAY": config["istio-gateway"],
             "ISTIO_TLS_MODE": config["istio-tls-mode"],
             "KEDA_ENABLED": str(bool(self.model.relations["keda"])).lower(),
@@ -132,7 +138,6 @@ class Operator(CharmBase):
             "USE_EXECUTOR": str(config["use-executor"]).lower(),
             "WATCH_NAMESPACE": config["watch-namespace"],
         }
-
         self.model.unit.status = MaintenanceStatus("Setting pod spec")
         self.model.pod.set_spec(
             {

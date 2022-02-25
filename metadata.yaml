@@ -11,8 +11,6 @@ resources:
     auto-fetch: true
     upstream-source: 'docker.io/seldonio/seldon-core-operator:1.6.0'
 requires:
-  istio:
-    interface: service-mesh
   ambassador:
     interface: service-mesh
   keda:

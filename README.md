@@ -14,6 +14,15 @@ follows
 $ juju deploy seldon-core seldon-controller-manager
 ```
 
+Seldon also offers significant but optional integration with Istio, using gateways,
+ virtual services, etc., to provide an improved model serving experience.  To integrate
+ with an existing implementation of Istio, simply provide the Istio gateway name as
+ configuration:
+
+```sh
+juju config seldon-controller-manager istio-gateway=my-gateway-name
+```
+
 ## Looking for a fully supported platform for MLOps?
 
 Canonical [Charmed Kubeflow](https://charmed-kubeflow.io) is a state of the art, fully supported MLOps platform that helps data scientists collaborate on AI innovation on any cloud from concept to production, offered by Canonical - the publishers of [Ubuntu](https://ubuntu.com).
