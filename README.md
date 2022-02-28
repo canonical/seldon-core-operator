@@ -5,7 +5,7 @@ This repository hosts the Kubernetes Python Operator for Seldon Core
 
 The Seldon Core Operator is a Python script that wraps the latest released Seldon Core manifest, providing lifecycle management and handling events (install, upgrade, integrate, remove).
 
-### Usage
+### Deployment
 
 The Seldon Core Operator may be deployed using the Juju command line as
 follows
@@ -22,6 +22,11 @@ Seldon also offers significant but optional integration with Istio, using gatewa
 ```sh
 juju config seldon-controller-manager istio-gateway=my-gateway-name
 ```
+
+### Usage examples
+
+See [this example](examples/ingress_canary_and_auth.ipynb) to deploy and use 
+ `SeldonDeployment` both with and without a protected Ingress Gateway.
 
 ## Looking for a fully supported platform for MLOps?
 
