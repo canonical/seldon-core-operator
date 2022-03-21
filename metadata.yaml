@@ -4,6 +4,7 @@ description: |
   An open source platform to deploy your machine learning models
   on Kubernetes at massive scale.
 series: [kubernetes]
+min-juju-version: "2.9.0"
 resources:
   oci-image:
     type: oci-image
