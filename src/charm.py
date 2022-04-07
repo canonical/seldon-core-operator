@@ -34,13 +34,12 @@ class Operator(CharmBase):
                 self.on[rel].relation_changed,
                 self.set_pod_spec,
             )
+
         self.prometheus_provider = MetricsEndpointProvider(
             charm=self,
-            relation_name="monitoring",
+            relation_name="metrics-endpoint",
             jobs=[
                 {
-                    "job_name": "seldon_core_metrics",
-                    "scrape_interval": "30s",
                     "metrics_path": self.config["executor-server-metrics-port-name"],
                     "static_configs": [
                         {"targets": ["*:{}".format(self.config["metrics-port"])]}
@@ -48,14 +47,11 @@ class Operator(CharmBase):
                 }
             ],
         )
-        self.dashboard_provider = GrafanaDashboardProvider(self)
-        monitoring_events = [
-            self.on["monitoring"].relation_changed,
-            self.on["monitoring"].relation_broken,
-            self.on["monitoring"].relation_departed,
-        ]
-        for e in monitoring_events:
-            self.framework.observe(e, self.set_pod_spec)
+
+        self.dashboard_provider = GrafanaDashboardProvider(
+            charm=self,
+            relation_name="grafana-dashboard",
+        )
 
     def set_pod_spec(self, event):
         if not self.model.unit.is_leader():
