@@ -59,7 +59,7 @@ def test_prometheus_data_set(harness, mocker):
         ]
     }
     mock_net_get.return_value = fake_network
-    rel_id = harness.add_relation("monitoring", "otherapp")
+    rel_id = harness.add_relation("metrics-endpoint", "otherapp")
     harness.add_relation_unit(rel_id, "otherapp/0")
     harness.update_relation_data(rel_id, "otherapp", {})
 

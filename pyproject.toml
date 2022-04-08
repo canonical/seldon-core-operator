@@ -1,0 +1,6 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+# Formatting tools configuration
+[tool.black]
+exclude = ["lib"]

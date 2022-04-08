@@ -1,7 +1,179 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""A library for integrating Grafana dashboards in charmed operators."""
+"""## Overview.
+
+This document explains how to integrate with the Grafana charm
+for the purpose of providing a dashboard which can be used by
+end users. It also explains the structure of the data
+expected by the `grafana-dashboard` interface, and may provide a
+mechanism or reference point for providing a compatible interface
+or library by providing a definitive reference guide to the
+structure of relation data which is shared between the Grafana
+charm and any charm providing datasource information.
+
+## Provider Library Usage
+
+The Grafana charm interacts with its dashboards using its charm
+library. The goal of this library is to be as simple to use as
+possible, and instantiation of the class with or without changing
+the default arguments provides a complete use case. For the simplest
+use case of a charm which bundles dashboards and provides a
+`provides: grafana-dashboard` interface,
+
+    requires:
+      grafana-dashboard:
+        interface: grafana_dashboard
+
+creation of a `GrafanaDashboardProvider` object with the default arguments is
+sufficient.
+
+:class:`GrafanaDashboardProvider` expects that bundled dashboards should
+be included in your charm with a default path of:
+
+    path/to/charm.py
+    path/to/src/grafana_dashboards/*.{json|json.tmpl|.tmpl}
+
+Where the files are Grafana dashboard JSON data either from the
+Grafana marketplace, or directly exported from a Grafana instance.
+Refer to the [official docs](https://grafana.com/tutorials/provision-dashboards-and-data-sources/)
+for more information.
+
+When constructing a dashboard that is intended to be consumed by COS, make sure to use variables
+for your datasources, and name them "prometheusds" and "lokids". You can also use the following
+juju topology variables in your dashboards: $juju_model, $juju_model_uuid, $juju_application
+and $juju_unit. Note, however, that if metrics are coming via peripheral charms (scrape-config
+or cos-config) then topology labels would not exist.
+
+The default constructor arguments are:
+
+    `charm`: `self` from the charm instantiating this library
+    `relation_name`: grafana-dashboard
+    `dashboards_path`: "/src/grafana_dashboards"
+
+If your configuration requires any changes from these defaults, they
+may be set from the class constructor. It may be instantiated as
+follows:
+
+    from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+
+    class FooCharm:
+        def __init__(self, *args):
+            super().__init__(*args, **kwargs)
+            ...
+            self.grafana_dashboard_provider = GrafanaDashboardProvider(self)
+            ...
+
+The first argument (`self`) should be a reference to the parent (providing
+dashboards), as this charm's lifecycle events will be used to re-submit
+dashboard information if a charm is upgraded, the pod is restarted, or other.
+
+An instantiated `GrafanaDashboardProvider` validates that the path specified
+in the constructor (or the default) exists, reads the file contents, then
+compresses them with LZMA and adds them to the application relation data
+when a relation is established with Grafana.
+
+Provided dashboards will be checked by Grafana, and a series of dropdown menus
+providing the ability to select query targets by Juju Model, application instance,
+and unit will be added if they do not exist.
+
+To avoid requiring `jinja` in `GrafanaDashboardProvider` users, template validation
+and rendering occurs on the other side of the relation, and relation data in
+the form of:
+
+    {
+        "event": {
+            "valid": `true|false`,
+            "errors": [],
+        }
+    }
+
+Will be returned if rendering or validation fails. In this case, the
+`GrafanaDashboardProvider` object will emit a `dashboard_status_changed` event
+of the type :class:`GrafanaDashboardEvent`, which will contain information
+about the validation error.
+
+This information is added to the relation data for the charms as serialized JSON
+from a dict, with a structure of:
+```
+{
+    "application": {
+        "dashboards": {
+            "uuid": a uuid generated to ensure a relation event triggers,
+            "templates": {
+                "file:{hash}": {
+                    "content": `{compressed_template_data}`,
+                    "charm": `charm.meta.name`,
+                    "juju_topology": {
+                        "model": `charm.model.name`,
+                        "model_uuid": `charm.model.uuid`,
+                        "application": `charm.app.name`,
+                        "unit": `charm.unit.name`,
+                    }
+                },
+                "file:{other_file_hash}": {
+                    ...
+                },
+            },
+        },
+    },
+}
+```
+
+This is ingested by :class:`GrafanaDashboardConsumer`, and is sufficient for configuration.
+
+The [COS Configuration Charm](https://charmhub.io/cos-configuration-k8s) can be used to
+add dashboards which are not bundled with charms.
+
+## Consumer Library Usage
+
+The `GrafanaDashboardConsumer` object may be used by Grafana
+charms to manage relations with available dashboards. For this
+purpose, a charm consuming Grafana dashboard information should do
+the following things:
+
+1. Instantiate the `GrafanaDashboardConsumer` object by providing it a
+reference to the parent (Grafana) charm and, optionally, the name of
+the relation that the Grafana charm uses to interact with dashboards.
+This relation must confirm to the `grafana-dashboard` interface.
+
+For example a Grafana charm may instantiate the
+`GrafanaDashboardConsumer` in its constructor as follows
+
+    from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardConsumer
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        ...
+        self.grafana_dashboard_consumer = GrafanaDashboardConsumer(self)
+        ...
+
+2. A Grafana charm also needs to listen to the
+`GrafanaDashboardConsumer` events emitted by the `GrafanaDashboardConsumer`
+by adding itself as an observer for these events:
+
+    self.framework.observe(
+        self.grafana_source_consumer.on.sources_changed,
+        self._on_dashboards_changed,
+    )
+
+Dashboards can be retrieved the :meth:`dashboards`:
+
+It will be returned in the format of:
+
+```
+[
+    {
+        "id": unique_id,
+        "relation_id": relation_id,
+        "charm": the name of the charm which provided the dashboard,
+        "content": compressed_template_data
+    },
+]
+```
+
+The consuming charm should decompress the dashboard.
+"""
 
 import base64
 import json
@@ -41,12 +213,13 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 11
 
 logger = logging.getLogger(__name__)
 
 
 DEFAULT_RELATION_NAME = "grafana-dashboard"
+DEFAULT_PEER_NAME = "grafana"
 RELATION_INTERFACE_NAME = "grafana_dashboard"
 
 TEMPLATE_DROPDOWNS = [
@@ -358,17 +531,86 @@ def _decode_dashboard_content(encoded_content: str) -> str:
     return lzma.decompress(base64.b64decode(encoded_content.encode("utf-8"))).decode()
 
 
-def _inject_dashboard_dropdowns(content: str) -> str:
-    """Make sure dropdowns are present for Juju topology."""
+def _convert_dashboard_fields(content: str) -> str:
+    """Make sure values are present for Juju topology.
+
+    Inserts Juju topology variables and selectors into the template, as well as
+    a variable for Prometheus.
+    """
     dict_content = json.loads(content)
-    if "templating" not in content:
+    datasources = {}
+    existing_templates = False
+
+    # If no existing template variables exist, just insert our own
+    if "templating" not in dict_content:
         dict_content["templating"] = {"list": [d for d in TEMPLATE_DROPDOWNS]}
     else:
+        # Otherwise, set a flag so we can go back later
+        existing_templates = True
+        for maybe in dict_content["templating"]["list"]:
+            # Build a list of `datasource_name`: `datasource_type` mappings
+            # The "query" field is actually "prometheus", "loki", "influxdb", etc
+            if "type" in maybe and maybe["type"] == "datasource":
+                datasources[maybe["name"]] = maybe["query"]
+
+        # Put our own variables in the template
         for d in TEMPLATE_DROPDOWNS:
             if d not in dict_content["templating"]["list"]:
                 dict_content["templating"]["list"].insert(0, d)
 
+    dict_content = _replace_template_fields(dict_content, datasources, existing_templates)
+
     return json.dumps(dict_content)
+
+
+def _replace_template_fields(
+    dict_content: dict, datasources: dict, existing_templates: bool
+) -> dict:
+    """Make templated fields get cleaned up afterwards.
+
+    If existing datasource variables are present, try to substitute them, otherwise
+    assume they are all for Prometheus and put the prometheus variable there.
+    """
+    replacements = {"loki": "${lokids}", "prometheus": "${prometheusds}"}
+    used_replacements = []
+
+    # If any existing datasources match types we know, or we didn't find
+    # any templating variables at all, template them.
+    if datasources or not existing_templates:
+        panels = dict_content["panels"]
+
+        # Go through all of the panels. If they have a datasource set, AND it's one
+        # that we can convert to ${lokids} or ${prometheusds}, by stripping off the
+        # ${} templating and comparing the name to the list we built, replace it,
+        # otherwise, leave it alone.
+        #
+        # COS only knows about Prometheus and Loki.
+        for panel in panels:
+            if "datasource" not in panel:
+                continue
+            if not existing_templates:
+                panel["datasource"] = "${prometheusds}"
+            else:
+                # Strip out variable characters and maybe braces
+                ds = re.sub(r"(\$|\{|\})", "", panel["datasource"])
+                replacement = replacements.get(datasources[ds], "")
+                if replacement:
+                    used_replacements.append(ds)
+                panel["datasource"] = replacement or panel["datasource"]
+
+        # Put our substitutions back
+        dict_content["panels"] = panels
+
+    # Finally, go back and pop off the templates we stubbed out
+    deletions = []
+    for tmpl in dict_content["templating"]["list"]:
+        if tmpl["name"] and tmpl["name"] in used_replacements:
+            deletions.append(tmpl)
+
+    for d in deletions:
+        dict_content["templating"]["list"].remove(d)
+
+    return dict_content
 
 
 def _type_convert_stored(obj):
@@ -513,6 +755,8 @@ class GrafanaDashboardProvider(Object):
         self._charm = charm
         self._relation_name = relation_name
         self._dashboards_path = dashboards_path
+
+        # No peer relation bucket we can rely on providers, keep StoredState here, too
         self._stored.set_default(dashboard_templates={})
 
         self.framework.observe(self._charm.on.leader_elected, self._update_all_dashboards_from_dir)
@@ -559,6 +803,7 @@ class GrafanaDashboardProvider(Object):
         for dashboard_id in list(stored_dashboard_templates.keys()):
             if dashboard_id.startswith("prog:"):
                 del stored_dashboard_templates[dashboard_id]
+        self._stored.dashboard_templates = stored_dashboard_templates
 
         if self._charm.unit.is_leader():
             for dashboard_relation in self._charm.model.relations[self._relation_name]:
@@ -570,7 +815,7 @@ class GrafanaDashboardProvider(Object):
             for dashboard_relation in self._charm.model.relations[self._relation_name]:
                 self._upset_dashboards_on_relation(dashboard_relation)
 
-    def _update_all_dashboards_from_dir(self, _: HookEvent) -> None:
+    def _update_all_dashboards_from_dir(self, _: Optional[HookEvent] = None) -> None:
         """Scans the built-in dashboards and updates relations with changes."""
         # Update of storage must be done irrespective of leadership, so
         # that the stored state is there when this unit becomes leader.
@@ -584,12 +829,47 @@ class GrafanaDashboardProvider(Object):
                 if dashboard_id.startswith("file:"):
                     del stored_dashboard_templates[dashboard_id]
 
-            for path in filter(Path.is_file, Path(self._dashboards_path).glob("*.tmpl")):
+            # Path.glob uses fnmatch on the backend, which is pretty limited, so use a
+            # lambda for the filter
+            for path in filter(
+                lambda p: p.is_file and p.name.endswith((".json", ".json.tmpl", ".tmpl")),
+                Path(self._dashboards_path).glob("*"),
+            ):
                 id = "file:{}".format(path.stem)
                 stored_dashboard_templates[id] = self._content_to_dashboard_object(
                     _encode_dashboard_content(path.read_bytes())
                 )
 
+            self._stored.dashboard_templates = stored_dashboard_templates
+
+            if self._charm.unit.is_leader():
+                for dashboard_relation in self._charm.model.relations[self._relation_name]:
+                    self._upset_dashboards_on_relation(dashboard_relation)
+
+    def _reinitialize_dashboard_data(self) -> None:
+        """Triggers a reload of dashboard outside of an eventing workflow.
+
+        This will destroy any existing relation data.
+        """
+        try:
+            _resolve_dir_against_charm_path(self._charm, self._dashboards_path)
+            self._update_all_dashboards_from_dir()
+
+        except InvalidDirectoryPathError as e:
+            logger.warning(
+                "Invalid Grafana dashboards folder at %s: %s",
+                e.grafana_dashboards_absolute_path,
+                e.message,
+            )
+            stored_dashboard_templates = self._stored.dashboard_templates
+
+            for dashboard_id in list(stored_dashboard_templates.keys()):
+                if dashboard_id.startswith("file:"):
+                    del stored_dashboard_templates[dashboard_id]
+            self._stored.dashboard_templates = stored_dashboard_templates
+
+            # With all of the file-based dashboards cleared out, force a refresh
+            # of relation data
             if self._charm.unit.is_leader():
                 for dashboard_relation in self._charm.model.relations[self._relation_name]:
                     self._upset_dashboards_on_relation(dashboard_relation)
@@ -665,7 +945,11 @@ class GrafanaDashboardConsumer(Object):
     on = GrafanaDashboardEvents()
     _stored = StoredState()
 
-    def __init__(self, charm: CharmBase, relation_name: str = DEFAULT_RELATION_NAME) -> None:
+    def __init__(
+        self,
+        charm: CharmBase,
+        relation_name: str = DEFAULT_RELATION_NAME,
+    ) -> None:
         """API to receive Grafana dashboards from charmed operators.
 
         The :class:`GrafanaDashboardConsumer` object provides an API
@@ -715,6 +999,10 @@ class GrafanaDashboardConsumer(Object):
             self._charm.on[self._relation_name].relation_broken,
             self._on_grafana_dashboard_relation_broken,
         )
+        self.framework.observe(
+            self._charm.on[DEFAULT_PEER_NAME].relation_changed,
+            self._on_grafana_peer_changed,
+        )
 
     def get_dashboards_from_relation(self, relation_id: int) -> List:
         """Get a list of known dashboards for one instance of the monitored relation.
@@ -727,7 +1015,7 @@ class GrafanaDashboardConsumer(Object):
         """
         return [
             self._to_external_object(relation_id, dashboard)
-            for dashboard in self._stored.dashboards.get(relation_id, [])
+            for dashboard in self._get_stored_dashboards(relation_id)
         ]
 
     def _on_grafana_dashboard_relation_changed(self, event: RelationChangedEvent) -> None:
@@ -740,12 +1028,18 @@ class GrafanaDashboardConsumer(Object):
         available in the app's datastore object. The Grafana charm can
         then respond to the event to update its configuration.
         """
-        # TODO Are we sure this is right? It sounds like every Grafana unit
-        # should create files with the dashboards in its container.
-        if not self._charm.unit.is_leader():
-            return
+        changes = False
+        if self._charm.unit.is_leader():
+            changes = self._render_dashboards_and_signal_changed(event.relation)
 
-        self._render_dashboards_and_emit_event(event.relation)
+        if changes:
+            self.on.dashboards_changed.emit()
+
+    def _on_grafana_peer_changed(self, _: RelationChangedEvent) -> None:
+        """Emit dashboard events on peer events so secondary charm data updates."""
+        if self._charm.unit.is_leader():
+            return
+        self.on.dashboards_changed.emit()
 
     def update_dashboards(self, relation: Optional[Relation] = None) -> None:
         """Re-establish dashboards on one or more relations.
@@ -758,13 +1052,17 @@ class GrafanaDashboardConsumer(Object):
                 updated. If not specified, all relations managed by this
                 :class:`GrafanaDashboardConsumer` will be updated.
         """
-        if not self._charm.unit.is_leader():
-            return
+        changes = False
+        if self._charm.unit.is_leader():
+            relations = (
+                [relation] if relation else self._charm.model.relations[self._relation_name]
+            )
 
-        relations = [relation] if relation else self._charm.model.relations[self._relation_name]
+            for relation in relations:
+                self._render_dashboards_and_signal_changed(relation)  # type: ignore
 
-        for relation in relations:
-            self._render_dashboards_and_emit_event(relation)
+        if changes:
+            self.on.dashboards_changed.emit()
 
     def _on_grafana_dashboard_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Update job config when providers depart.
@@ -777,7 +1075,7 @@ class GrafanaDashboardConsumer(Object):
 
         self._remove_all_dashboards_for_relation(event.relation)
 
-    def _render_dashboards_and_emit_event(self, relation: Relation) -> None:
+    def _render_dashboards_and_signal_changed(self, relation: Relation) -> bool:  # type: ignore
         """Validate a given dashboard.
 
         Verify that the passed dashboard data is able to be found in our list
@@ -786,6 +1084,9 @@ class GrafanaDashboardConsumer(Object):
 
         Args:
             relation: Relation; The relation the dashboard is associated with.
+
+        Returns:
+            a boolean indicating whether an event should be emitted
         """
         other_app = relation.app
 
@@ -797,7 +1098,7 @@ class GrafanaDashboardConsumer(Object):
                 self._relation_name,
                 str(relation.id),
             )
-            return
+            return False
 
         data = json.loads(raw_data)
 
@@ -821,13 +1122,20 @@ class GrafanaDashboardConsumer(Object):
         relation_has_invalid_dashboards = False
 
         for _, (fname, template) in enumerate(templates.items()):
-            decoded_content = _decode_dashboard_content(template["content"])
-
+            decoded_content = None
             content = None
             error = None
             try:
+                decoded_content = _decode_dashboard_content(template["content"])
                 content = Template(decoded_content).render()
-                content = _encode_dashboard_content(_inject_dashboard_dropdowns(content))
+                content = _encode_dashboard_content(_convert_dashboard_fields(content))
+            except lzma.LZMAError as e:
+                error = str(e)
+                relation_has_invalid_dashboards = True
+            except json.JSONDecodeError as e:
+                error = str(e.msg)
+                logger.warning("Invalid JSON in Grafana dashboard: {}".format(fname))
+                continue
             except TemplateSyntaxError as e:
                 error = str(e)
                 relation_has_invalid_dashboards = True
@@ -876,22 +1184,27 @@ class GrafanaDashboardConsumer(Object):
             )
 
             # Dropping dashboards for a relation needs to be signalled
-            self.on.dashboards_changed.emit()
+            return True
         else:
             stored_data = rendered_dashboards
-            currently_stored_data = self._stored.dashboards.get(relation.id, {})
+            currently_stored_data = self._get_stored_dashboards(relation.id)
 
             coerced_data = (
                 _type_convert_stored(currently_stored_data) if currently_stored_data else {}
             )
 
             if not coerced_data == stored_data:
-                self._stored.dashboards[relation.id] = stored_data
-                self.on.dashboards_changed.emit()
+                stored_dashboards = self.get_peer_data("dashboards")
+                stored_dashboards[relation.id] = stored_data
+                self.set_peer_data("dashboards", stored_dashboards)
+                return True
 
     def _remove_all_dashboards_for_relation(self, relation: Relation) -> None:
         """If an errored dashboard is in stored data, remove it and trigger a deletion."""
-        if self._stored.dashboards.pop(relation.id, None):
+        if self._get_stored_dashboards(relation.id):
+            stored_dashboards = self.get_peer_data("dashboards")
+            stored_dashboards.pop(str(relation.id))
+            self.set_peer_data("dashboards", stored_dashboards)
             self.on.dashboards_changed.emit()
 
     def _to_external_object(self, relation_id, dashboard):
@@ -912,12 +1225,32 @@ class GrafanaDashboardConsumer(Object):
         dashboards = []
 
         for _, (relation_id, dashboards_for_relation) in enumerate(
-            self._stored.dashboards.items()
+            self.get_peer_data("dashboards").items()
         ):
             for dashboard in dashboards_for_relation:
                 dashboards.append(self._to_external_object(relation_id, dashboard))
 
         return dashboards
+
+    def _get_stored_dashboards(self, relation_id: int) -> list:
+        """Pull stored dashboards out of the peer data bucket."""
+        return self.get_peer_data("dashboards").get(str(relation_id), {})
+
+    def _set_default_data(self) -> None:
+        """Set defaults if they are not in peer relation data."""
+        data = {"dashboards": {}}  # type: ignore
+        for k, v in data.items():
+            if not self.get_peer_data(k):
+                self.set_peer_data(k, v)
+
+    def set_peer_data(self, key: str, data: Any) -> None:
+        """Put information into the peer data bucket instead of `StoredState`."""
+        self._charm.peers.data[self._charm.app][key] = json.dumps(data)  # type: ignore
+
+    def get_peer_data(self, key: str) -> Any:
+        """Retrieve information from the peer data bucket instead of `StoredState`."""
+        data = self._charm.peers.data[self._charm.app].get(key, "")  # type: ignore
+        return json.loads(data) if data else {}
 
 
 class GrafanaDashboardAggregator(Object):
@@ -965,6 +1298,9 @@ class GrafanaDashboardAggregator(Object):
         grafana_relation: str = "downstream-grafana-dashboard",
     ):
         super().__init__(charm, grafana_relation)
+
+        # Reactive charms may be RPC-ish and not leave reliable data around. Keep
+        # StoredState here
         self._stored.set_default(
             dashboard_templates={},
             id_mappings={},
@@ -974,6 +1310,14 @@ class GrafanaDashboardAggregator(Object):
         self._target_relation = target_relation
         self._grafana_relation = grafana_relation
 
+        self.framework.observe(
+            self._charm.on[self._grafana_relation].relation_joined,
+            self._update_remote_grafana,
+        )
+        self.framework.observe(
+            self._charm.on[self._grafana_relation].relation_changed,
+            self._update_remote_grafana,
+        )
         self.framework.observe(
             self._charm.on[self._target_relation].relation_changed,
             self.update_dashboards,
@@ -998,13 +1342,16 @@ class GrafanaDashboardAggregator(Object):
             )
             return
 
-        self._stored.id_mappings[event.app.name] = dashboards
-
         for id in dashboards:
             self._stored.dashboard_templates[id] = self._content_to_dashboard_object(
                 dashboards[id], event
             )
 
+        self._stored.id_mappings[event.app.name] = dashboards
+        self._update_remote_grafana(event)
+
+    def _update_remote_grafana(self, _: Optional[RelationEvent] = None) -> None:
+        """Push dashboards to the downstream Grafana relation."""
         # It's still ridiculous to add a UUID here, but needed
         stored_data = {
             "templates": _type_convert_stored(self._stored.dashboard_templates),
@@ -1151,7 +1498,10 @@ class GrafanaDashboardAggregator(Object):
             )
 
         if dashboards_path:
-            for path in filter(Path.is_file, Path(dashboards_path).glob("*.tmpl")):
+            for path in filter(
+                lambda p: p.is_file and p.name.endswith((".json", ".json.tmpl", ".tmpl")),
+                Path(dashboards_path).glob("*"),
+            ):
                 if event.app.name in path.name:
                     id = "file:{}".format(path.stem)
                     builtins[id] = self._content_to_dashboard_object(
