@@ -1,5 +1,5 @@
 pytest
 pytest-mock
 flake8
-black==20.8b1
+black
 jinja2
