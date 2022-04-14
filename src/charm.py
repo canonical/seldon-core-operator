@@ -2,6 +2,8 @@
 
 import logging
 
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from jinja2 import Environment, FileSystemLoader
 from ops.charm import CharmBase
 from ops.main import main
@@ -32,6 +34,24 @@ class Operator(CharmBase):
                 self.on[rel].relation_changed,
                 self.set_pod_spec,
             )
+
+        self.prometheus_provider = MetricsEndpointProvider(
+            charm=self,
+            relation_name="metrics-endpoint",
+            jobs=[
+                {
+                    "metrics_path": self.config["executor-server-metrics-port-name"],
+                    "static_configs": [
+                        {"targets": ["*:{}".format(self.config["metrics-port"])]}
+                    ],
+                }
+            ],
+        )
+
+        self.dashboard_provider = GrafanaDashboardProvider(
+            charm=self,
+            relation_name="grafana-dashboard",
+        )
 
     def set_pod_spec(self, event):
         if not self.model.unit.is_leader():
