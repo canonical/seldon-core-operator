@@ -1,27 +1,28 @@
+# reusable workflow triggered by other actions
 name: Publish
 
 on:
-  push:
-    branches:
-      - master
-      - main
-      - track/**
-  pull_request:
-    branches:
-      - master
-      - main
-      - track/**
+  workflow_call:
+    secrets:
+      charmcraft-credentials:
+        required: true
 
 jobs:
+
   publish-charm:
     name: Publish Charm
     runs-on: ubuntu-latest
-    # Only publish to charmhub if we are pushing to a special branch or running PRs from something named `branch/*`
-    if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
-      - uses: actions/checkout@v2
-      - uses: canonical/charmhub-upload-action@0.2.0
+      - name: Checkout
+        uses: actions/checkout@v2
         with:
-          credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
-          charm-path: ./
-          charmcraft-channel: latest/edge
+          fetch-depth: 0
+      - name: Select charmhub channel
+        uses: canonical/charming-actions/channel@1.0.3
+        id: channel
+      - name: Upload charm to charmhub
+        uses: canonical/charming-actions/upload-charm@1.0.3
+        with:
+          credentials: "${{ secrets.charmcraft-credentials }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          channel: "${{ steps.channel.outputs.name }}"
