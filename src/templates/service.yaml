@@ -1,12 +1,13 @@
+# From seldon-core-operator/templates/service_seldon-webhook-service.yaml
 apiVersion: v1
 kind: Service
 metadata:
   labels:
     app: seldon
     app.kubernetes.io/instance: 'seldon-core'
-    app.kubernetes.io/version: '1.9.0'
+    app.kubernetes.io/version: '1.14.0'
   name: seldon-webhook-service
-  namespace: {{ namespace }}
+  namespace: '{{ namespace }}'
 spec:
   ports:
   - port: {{ webhook_port }}

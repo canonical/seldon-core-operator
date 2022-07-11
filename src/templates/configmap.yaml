@@ -1,4 +1,6 @@
+# Source: seldon-core-operator/templates/configmap_seldon-config.yaml
 apiVersion: v1
+# Source: seldon-core-operator/values.yaml
 data:
   credentials: >-
     {
@@ -10,33 +12,33 @@ data:
         "s3SecretAccessKeyName": "awsSecretAccessKey"
       }
     }
-  explainer: '{"image":"seldonio/alibiexplainer:1.9.0"}'
+  explainer: '{"image":"seldonio/alibiexplainer:1.14.0"}'
   predictor_servers: >-
     {
       "MLFLOW_SERVER": {
         "protocols": {
           "seldon": {
-            "defaultImageVersion": "1.9.0",
+            "defaultImageVersion": "1.14.0",
             "image": "seldonio/mlflowserver"
           }
         }
       },
       "SKLEARN_SERVER": {
         "protocols": {
-          "kfserving": {
-            "defaultImageVersion": "0.3.2",
+          "v2": {
+            "defaultImageVersion": "1.1.0-sklearn",
             "image": "seldonio/mlserver"
           },
           "seldon": {
-            "defaultImageVersion": "1.9.0",
+            "defaultImageVersion": "1.14.0",
             "image": "seldonio/sklearnserver"
           }
         }
       },
       "TEMPO_SERVER": {
         "protocols": {
-          "kfserving": {
-            "defaultImageVersion": "0.3.2",
+          "seldon": {
+            "defaultImageVersion": "1.1.0-slim",
             "image": "seldonio/mlserver"
           }
         }
@@ -44,7 +46,7 @@ data:
       "TENSORFLOW_SERVER": {
         "protocols": {
           "seldon": {
-            "defaultImageVersion": "1.9.0",
+            "defaultImageVersion": "1.14.0",
             "image": "seldonio/tfserving-proxy"
           },
           "tensorflow": {
@@ -55,7 +57,7 @@ data:
       },
       "TRITON_SERVER": {
         "protocols": {
-          "kfserving": {
+          "v2": {
             "defaultImageVersion": "20.08-py3",
             "image": "nvcr.io/nvidia/tritonserver"
           }
@@ -63,12 +65,12 @@ data:
       },
       "XGBOOST_SERVER": {
         "protocols": {
-          "kfserving": {
-            "defaultImageVersion": "0.3.2",
+          "v2": {
+            "defaultImageVersion": "1.1.0-xgboost",
             "image": "seldonio/mlserver"
           },
           "seldon": {
-            "defaultImageVersion": "1.9.0",
+            "defaultImageVersion": "1.14.0",
             "image": "seldonio/xgboostserver"
           }
         }
@@ -78,7 +80,7 @@ data:
     {
       "cpuLimit": "1",
       "cpuRequest": "100m",
-      "image": "seldonio/rclone-storage-initializer:1.9.0",
+      "image": "seldonio/rclone-storage-initializer:1.14.0",
       "memoryLimit": "1Gi",
       "memoryRequest": "100Mi"
     }
@@ -88,7 +90,7 @@ metadata:
     app: seldon
     app.kubernetes.io/instance: seldon-core
     app.kubernetes.io/name: seldon-core-operator
-    app.kubernetes.io/version: 1.9.0
+    app.kubernetes.io/version: 1.14.0
     control-plane: seldon-controller-manager
   name: seldon-config
   namespace: {{ namespace }}
