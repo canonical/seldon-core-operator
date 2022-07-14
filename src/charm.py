@@ -421,7 +421,7 @@ class Operator(CharmBase):
                                     }
                                     for name in (
                                         "configmap",
-                                        "crd",
+                                        "crd-v1",
                                         "service",
                                         "validate",
                                     )
