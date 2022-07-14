@@ -80,26 +80,6 @@ class Operator(CharmBase):
             ).lower(),
             "CONTROLLER_ID": config["controller-id"],
             "DEFAULT_USER_ID": config["default-user-id"],
-            "ENGINE_CONTAINER_IMAGE_AND_VERSION": config[
-                "engine-container-image-and-version"
-            ],
-            "ENGINE_CONTAINER_IMAGE_PULL_POLICY": config[
-                "engine-container-image-pull-policy"
-            ],
-            "ENGINE_CONTAINER_SERVICE_ACCOUNT_NAME": config[
-                "engine-container-service-account-name"
-            ],
-            "ENGINE_CONTAINER_USER": config["engine-container-user"],
-            "ENGINE_DEFAULT_CPU_LIMIT": config["engine-default-cpu-limit"],
-            "ENGINE_DEFAULT_CPU_REQUEST": config["engine-default-cpu-request"],
-            "ENGINE_DEFAULT_MEMORY_LIMIT": config["engine-default-memory-limit"],
-            "ENGINE_DEFAULT_MEMORY_REQUEST": config["engine-default-memory-request"],
-            "ENGINE_LOG_MESSAGES_EXTERNALLY": str(
-                config["engine-log-messages-externally"]
-            ).lower(),
-            "ENGINE_PROMETHEUS_PATH": config["engine-prometheus-path"],
-            "ENGINE_SERVER_GRPC_PORT": config["engine-server-grpc-port"],
-            "ENGINE_SERVER_PORT": config["engine-server-port"],
             "EXECUTOR_CONTAINER_IMAGE_AND_VERSION": config[
                 "executor-container-image-and-version"
             ],
@@ -137,7 +117,6 @@ class Operator(CharmBase):
                 "predictive-unit-metrics-port-name"
             ],
             "PREDICTIVE_UNIT_SERVICE_PORT": config["predictive-unit-service-port"],
-            "RELATED_IMAGE_ENGINE": config["related-image-engine"],
             "RELATED_IMAGE_EXECUTOR": config["related-image-executor"],
             "RELATED_IMAGE_EXPLAINER": config["related-image-explainer"],
             "RELATED_IMAGE_MLFLOWSERVER": config["related-image-mlflowserver"],
