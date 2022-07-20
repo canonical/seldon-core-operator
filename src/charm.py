@@ -142,6 +142,19 @@ class Operator(CharmBase):
                             "global": True,
                             "rules": [
                                 {
+                                    "apiGroups": ["coordination.k8s.io"],
+                                    "resources": ["leases"],
+                                    "verbs": [
+                                        "create",
+                                        "delete",
+                                        "get",
+                                        "list",
+                                        "patch",
+                                        "update",
+                                        "watch",
+                                    ],
+                                },
+                                {
                                     "apiGroups": [""],
                                     "resources": ["events"],
                                     "verbs": ["create", "patch"],
