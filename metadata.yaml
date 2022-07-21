@@ -10,7 +10,7 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    upstream-source: 'docker.io/seldonio/seldon-core-operator:1.6.0'
+    upstream-source: 'docker.io/seldonio/seldon-core-operator:1.14.0'
 requires:
   istio:
     interface: service-mesh
