@@ -7,7 +7,7 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from jinja2 import Environment, FileSystemLoader
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 
 from oci_image import OCIImageResource, OCIImageResourceError
 
@@ -18,16 +18,12 @@ class Operator(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        if not self.model.unit.is_leader():
-            log.info("Not a leader, skipping set_pod_spec")
-            self.model.unit.status = ActiveStatus()
-            return
-
         self.image = OCIImageResource(self, "oci-image")
 
         self.framework.observe(self.on.install, self.set_pod_spec)
         self.framework.observe(self.on.upgrade_charm, self.set_pod_spec)
         self.framework.observe(self.on.config_changed, self.set_pod_spec)
+        self.framework.observe(self.on.leader_elected, self.set_pod_spec)
 
         for rel in self.model.relations.keys():
             self.framework.observe(
@@ -54,9 +50,10 @@ class Operator(CharmBase):
         )
 
     def set_pod_spec(self, event):
-        if not self.model.unit.is_leader():
-            log.info("Not a leader, skipping set_pod_spec")
-            self.model.unit.status = ActiveStatus()
+        try:
+            self._check_leader()
+        except CheckFailed as error:
+            self.model.unit.status = error.status
             return
 
         try:
@@ -425,6 +422,22 @@ class Operator(CharmBase):
             },
         )
         self.model.unit.status = ActiveStatus()
+
+    def _check_leader(self):
+        if not self.unit.is_leader():
+            log.info("Not a leader, skipping set_pod_spec")
+            raise CheckFailed("Waiting for leadership", WaitingStatus)
+
+
+class CheckFailed(Exception):
+    """Raise this exception if one of the checks in main fails."""
+
+    def __init__(self, msg, status_type=None):
+        super().__init__()
+
+        self.msg = str(msg)
+        self.status_type = status_type
+        self.status = status_type(self.msg)
 
 
 if __name__ == "__main__":
