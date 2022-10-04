@@ -377,7 +377,7 @@ class Operator(CharmBase):
                 "containers": [
                     {
                         "name": "seldon-core",
-                        "command": ["/manager"],
+                        "command": ["/opt/seldon-core-operator/manager"],
                         "args": [
                             "--enable-leader-election",
                             "--webhook-port",
