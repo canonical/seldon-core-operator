@@ -18,11 +18,6 @@ from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
 from ops.pebble import ChangeError, Layer
-from serialized_data_interface import (
-    NoCompatibleVersions,
-    NoVersionsListed,
-    get_interfaces,
-)
 
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
@@ -299,18 +294,6 @@ class SeldonCoreOperator(CharmBase):
                 self.container.replan()
             except ChangeError:
                 raise CheckFailed("Failed to replan", BlockedStatus)
-
-    #
-    # Get interfaces
-    #
-    def _get_interfaces(self):
-        try:
-            interfaces = get_interfaces(self)
-        except NoVersionsListed as err:
-            raise CheckFailed(err, WaitingStatus)
-        except NoCompatibleVersions as err:
-            raise CheckFailed(err, BlockedStatus)
-        return interfaces
 
     #
     # Deploy all K8S resouces
