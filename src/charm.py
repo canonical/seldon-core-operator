@@ -149,7 +149,7 @@ class SeldonCoreOperator(CharmBase):
                 context=self._context,
                 logger=self.logger,
             )
-        load_in_cluster_generic_resources(self._k8s_resource_handler.lightkube_client)
+        load_in_cluster_generic_resources(self._crd_resource_handler.lightkube_client)
         return self._crd_resource_handler
 
     @crd_resource_handler.setter
@@ -165,7 +165,7 @@ class SeldonCoreOperator(CharmBase):
                 context=self._context,
                 logger=self.logger,
             )
-        load_in_cluster_generic_resources(self._k8s_resource_handler.lightkube_client)
+        load_in_cluster_generic_resources(self._configmap_resource_handler.lightkube_client)
         return self._configmap_resource_handler
 
     @configmap_resource_handler.setter
