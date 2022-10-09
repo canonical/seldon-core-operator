@@ -13,6 +13,7 @@ import json
 from ops.model import ActiveStatus, WaitingStatus, MaintenanceStatus
 from ops.testing import Harness
 from charm import SeldonCoreOperator
+from subprocess import check_call
 
 
 @pytest.fixture(scope="function")
@@ -145,3 +146,28 @@ class TestCharm:
         k8s_resource_handler.apply.assert_called()
         configmap_resource_handler.apply.assert_called()
         assert isinstance(harness.charm.model.unit.status, MaintenanceStatus)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
+    def test_get_certs(self, harness: Harness):
+        # setup container netwroking simulation
+        harness.set_can_connect("seldon-core", True)
+        harness.begin()
+
+        # cleanup previous tets, if any
+        check_call([
+            "rm",
+            "-f",
+            "/tmp/seldon-cert-gen-*",
+        ]
+        )
+
+        # obtain certs and verify contents
+        cert_info = harness.charm.gen_certs()
+        ssl_conf = open("/tmp/seldon-cert-gen-ssl.conf").read()
+        assert ssl_conf is not None
+        assert "{{ app }}" not in ssl_conf
+        assert "{{ model }}" not in ssl_conf
+        assert cert_info is not None
+        assert len(cert_info) == 3
+        for cert in cert_info.items():
+            assert len(str(cert[1])) != 0

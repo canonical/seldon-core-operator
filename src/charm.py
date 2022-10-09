@@ -5,6 +5,9 @@
 
 """ A Juju Charm for Seldon Core Operator """
 import logging
+from base64 import b64encode
+from pathlib import Path
+from subprocess import check_call
 
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -15,6 +18,7 @@ from lightkube.models.core_v1 import ServicePort
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from ops.charm import CharmBase
+from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
 from ops.pebble import ChangeError, Layer
@@ -30,6 +34,7 @@ CRD_RESOURCE_FILES = [
 CONFIGMAP_RESOURCE_FILES = [
     "src/templates/configmap.yaml.j2",
 ]
+SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 
 
 #
@@ -52,11 +57,15 @@ class CheckFailed(Exception):
 class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator"""
 
+    _stored = StoredState()
+
     def __init__(self, *args):
         super().__init__(*args)
 
         # retrieve configuration and base settings
         self.logger = logging.getLogger(__name__)
+        self._stored.set_default(**self.gen_certs())
+
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
@@ -76,6 +85,7 @@ class SeldonCoreOperator(CharmBase):
             "namespace": self._namespace,
             "service": self._name,
             "webhook_port": self._webhook_port,
+            "ca_bundle": b64encode(self._stored.ca.encode("ascii")).decode("utf-8"),
         }
         self._k8s_resource_handler = None
         self._crd_resource_handler = None
@@ -351,6 +361,91 @@ class SeldonCoreOperator(CharmBase):
             self.logger.warning(f"Failed to delete K8S resources, with error: {e}")
             raise e
         self.unit.status = MaintenanceStatus("K8S resources removed")
+
+    #
+    # Generate certificates
+    #
+    def gen_certs(self):
+
+        # generate SSL configuration based on template
+        model = self.model.name
+        app = self.model.app.name
+        try:
+            ssl_conf_template = open(SSL_CONFIG_FILE)
+            ssl_conf = ssl_conf_template.read()
+        except ApiError as error:
+            self.logger.warning(f"Failed to open SSL config file: {error}")
+
+        ssl_conf = ssl_conf.replace("{{ app }}", str(app))
+        ssl_conf = ssl_conf.replace("{{ model }}", str(model))
+        Path("/tmp/seldon-cert-gen-ssl.conf").write_text(ssl_conf)
+
+        # execute OpenSSL commands
+        check_call(["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-ca.key", "2048"])
+        check_call(
+            ["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-server.key", "2048"]
+        )
+        check_call(
+            [
+                "openssl",
+                "req",
+                "-x509",
+                "-new",
+                "-sha256",
+                "-nodes",
+                "-days",
+                "3650",
+                "-key",
+                "/tmp/seldon-cert-gen-ca.key",
+                "-subj",
+                "/CN=127.0.0.1",
+                "-out",
+                "/tmp/seldon-cert-gen-ca.crt",
+            ]
+        )
+        check_call(
+            [
+                "openssl",
+                "req",
+                "-new",
+                "-sha256",
+                "-key",
+                "/tmp/seldon-cert-gen-server.key",
+                "-out",
+                "/tmp/seldon-cert-gen-server.csr",
+                "-config",
+                "/tmp/seldon-cert-gen-ssl.conf",
+            ]
+        )
+        check_call(
+            [
+                "openssl",
+                "x509",
+                "-req",
+                "-sha256",
+                "-in",
+                "/tmp/seldon-cert-gen-server.csr",
+                "-CA",
+                "/tmp/seldon-cert-gen-ca.crt",
+                "-CAkey",
+                "/tmp/seldon-cert-gen-ca.key",
+                "-CAcreateserial",
+                "-out",
+                "/tmp/seldon-cert-gen-cert.pem",
+                "-days",
+                "365",
+                "-extensions",
+                "v3_ext",
+                "-extfile",
+                "/tmp/seldon-cert-gen-ssl.conf",
+            ]
+        )
+
+        return {
+            "cert": Path("/tmp/seldon-cert-gen-cert.pem").read_text(),
+            "key": Path("/tmp/seldon-cert-gen-server.key").read_text(),
+            "ca": Path("/tmp/seldon-cert-gen-ca.crt").read_text(),
+        }
 
 
 #
