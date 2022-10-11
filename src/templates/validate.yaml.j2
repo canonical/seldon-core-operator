@@ -15,7 +15,7 @@ webhooks:
   clientConfig:
     caBundle: {{ ca_bundle }}
     service:
-      name: seldon-webhook-service
+      name: {{ service }}
       port: {{ webhook_port }}
       namespace: {{ namespace }}
       path: /validate-machinelearning-seldon-io-v1-seldondeployment

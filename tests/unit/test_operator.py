@@ -13,7 +13,6 @@ import json
 from ops.model import ActiveStatus, WaitingStatus, MaintenanceStatus
 from ops.testing import Harness
 from charm import SeldonCoreOperator
-from subprocess import check_call
 
 
 @pytest.fixture(scope="function")
@@ -152,14 +151,6 @@ class TestCharm:
         # setup container netwroking simulation
         harness.set_can_connect("seldon-core", True)
         harness.begin()
-
-        # cleanup previous tets, if any
-        check_call([
-            "rm",
-            "-f",
-            "/tmp/seldon-cert-gen-*",
-        ]
-        )
 
         # obtain certs and verify contents
         cert_info = harness.charm.gen_certs()

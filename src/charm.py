@@ -308,6 +308,27 @@ class SeldonCoreOperator(CharmBase):
                 raise CheckFailed("Failed to replan", BlockedStatus)
 
     #
+    # Upload certs to container
+    #
+    def _upload_certs_to_container(self):
+
+        self.container.push(
+            "/tmp/k8s-webhook-server/serving-certs/tls.key",
+            self._stored.key,
+            make_dirs=True,
+        )
+        self.container.push(
+            "/tmp/k8s-webhook-server/serving-certs/tls.crt",
+            self._stored.cert,
+            make_dirs=True,
+        )
+        self.container.push(
+            "/tmp/k8s-webhook-server/serving-certs/ca.crt",
+            self._stored.ca,
+            make_dirs=True,
+        )
+
+    #
     # Deploy all K8S resouces
     #
     def _deploy_k8s_resources(self) -> None:
@@ -328,6 +349,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_container_connection()
             self._check_leader()
+            self._upload_certs_to_container()
             self._deploy_k8s_resources()
             self._update_layer()
         except CheckFailed as error:
@@ -441,11 +463,16 @@ class SeldonCoreOperator(CharmBase):
             ]
         )
 
-        return {
+        ret_certs = {
             "cert": Path("/tmp/seldon-cert-gen-cert.pem").read_text(),
             "key": Path("/tmp/seldon-cert-gen-server.key").read_text(),
             "ca": Path("/tmp/seldon-cert-gen-ca.crt").read_text(),
         }
+
+        # cleanup temporary files
+        check_call(["rm", "-f", "/tmp/seldon-cert-gen-*"])
+
+        return ret_certs
 
 
 #
