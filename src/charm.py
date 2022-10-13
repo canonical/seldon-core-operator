@@ -359,7 +359,7 @@ class SeldonCoreOperator(CharmBase):
         self.model.unit.status = ActiveStatus()
 
     #
-    # Remove all resouces
+    # Remove all resources
     #
     def _on_remove(self, _):
         self.unit.status = MaintenanceStatus("Removing K8S resources")
