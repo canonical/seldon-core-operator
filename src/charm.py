@@ -3,24 +3,26 @@
 # See LICENSE file for licensing details.
 #
 
-""" A Juju Charm for Seldon Core Operator """
+"""A Juju Charm for Seldon Core Operator."""
+
 import logging
 from base64 import b64encode
 from pathlib import Path
 from subprocess import check_call
 
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from lightkube.models.core_v1 import ServicePort
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
+from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
 
 K8S_RESOURCE_FILES = [
@@ -37,49 +39,32 @@ CONFIGMAP_RESOURCE_FILES = [
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 
 
-#
-# Helper for raising the exception
-#
-class CheckFailed(Exception):
-    """Raise this exception if one of the checks in main fails."""
-
-    def __init__(self, msg, status_type=None):
-        super().__init__()
-
-        self.msg = str(msg)
-        self.status_type = status_type
-        self.status = status_type(self.msg)
-
-
-#
-# Seldon Core Operator
-#
 class SeldonCoreOperator(CharmBase):
-    """A Juju Charm for Seldon Core Operator"""
+    """A Juju Charm for Seldon Core Operator."""
 
     _stored = StoredState()
 
     def __init__(self, *args):
+        """Initialize charm and setup the container."""
         super().__init__(*args)
 
         # retrieve configuration and base settings
         self.logger = logging.getLogger(__name__)
-        self._stored.set_default(**self.gen_certs())
-
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
         self._metrics_port = self.model.config["metrics-port"]
         self._webhook_port = self.model.config["webhook-port"]
         self._exec_command = (
-            "/manager "
-            "--enable-leader-election "
-            f"--webhook-port {self._webhook_port} "
+            "/manager " "--enable-leader-election " f"--webhook-port {self._webhook_port} "
         )
         self._container_name = "seldon-core"
         self._container = self.unit.get_container(self._container_name)
 
-        # setup context to be used for updating K8S resouces
+        # generate certs
+        self._stored.set_default(**self._gen_certs())
+
+        # setup context to be used for updating K8S resources
         self._context = {
             "app_name": self._name,
             "namespace": self._namespace,
@@ -100,7 +85,6 @@ class SeldonCoreOperator(CharmBase):
         )
 
         # setup events
-        self.framework.observe(self.on.install, self.main)
         self.framework.observe(self.on.upgrade_charm, self.main)
         self.framework.observe(self.on.config_changed, self.main)
         self.framework.observe(self.on.leader_elected, self.main)
@@ -108,6 +92,7 @@ class SeldonCoreOperator(CharmBase):
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self.main)
+        self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.remove, self._on_remove)
 
         # Prometheus related config
@@ -117,9 +102,7 @@ class SeldonCoreOperator(CharmBase):
             jobs=[
                 {
                     "metrics_path": self.config["executor-server-metrics-port-name"],
-                    "static_configs": [
-                        {"targets": ["*:{}".format(self.config["metrics-port"])]}
-                    ],
+                    "static_configs": [{"targets": ["*:{}".format(self.config["metrics-port"])]}],
                 }
             ],
         )
@@ -132,10 +115,12 @@ class SeldonCoreOperator(CharmBase):
 
     @property
     def container(self):
+        """Return container."""
         return self._container
 
     @property
     def k8s_resource_handler(self):
+        """Update K8S with K8S resources."""
         if not self._k8s_resource_handler:
             self._k8s_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
@@ -152,6 +137,7 @@ class SeldonCoreOperator(CharmBase):
 
     @property
     def crd_resource_handler(self):
+        """Update K8S with CRD resources."""
         if not self._crd_resource_handler:
             self._crd_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
@@ -168,6 +154,7 @@ class SeldonCoreOperator(CharmBase):
 
     @property
     def configmap_resource_handler(self):
+        """Update K8S with ConfigMap resources."""
         if not self._configmap_resource_handler:
             self._configmap_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
@@ -175,34 +162,23 @@ class SeldonCoreOperator(CharmBase):
                 context=self._context,
                 logger=self.logger,
             )
-        load_in_cluster_generic_resources(
-            self._configmap_resource_handler.lightkube_client
-        )
+        load_in_cluster_generic_resources(self._configmap_resource_handler.lightkube_client)
         return self._configmap_resource_handler
 
     @configmap_resource_handler.setter
     def configmap_resource_handler(self, handler: KubernetesResourceHandler):
         self._configmap_resource_handler = handler
 
-    #
-    # Return environment variables based on model configuration
-    #
     def _get_env_vars(self):
-
+        """Return environment variables based on model configuration."""
         config = self.model.config
         ret_env_vars = {
             "AMBASSADOR_ENABLED": str(bool(self.model.relations["ambassador"])).lower(),
-            "AMBASSADOR_SINGLE_NAMESPACE": str(
-                config["ambassador-single-namespace"]
-            ).lower(),
+            "AMBASSADOR_SINGLE_NAMESPACE": str(config["ambassador-single-namespace"]).lower(),
             "CONTROLLER_ID": config["controller-id"],
             "DEFAULT_USER_ID": config["default-user-id"],
-            "EXECUTOR_CONTAINER_IMAGE_AND_VERSION": config[
-                "executor-container-image-and-version"
-            ],
-            "EXECUTOR_CONTAINER_IMAGE_PULL_POLICY": config[
-                "executor-container-image-pull-policy"
-            ],
+            "EXECUTOR_CONTAINER_IMAGE_AND_VERSION": config["executor-container-image-and-version"],
+            "EXECUTOR_CONTAINER_IMAGE_PULL_POLICY": config["executor-container-image-pull-policy"],
             "EXECUTOR_CONTAINER_SERVICE_ACCOUNT_NAME": config[
                 "executor-container-service-account-name"
             ],
@@ -210,16 +186,12 @@ class SeldonCoreOperator(CharmBase):
             "EXECUTOR_DEFAULT_CPU_LIMIT": config["executor-default-cpu-limit"],
             "EXECUTOR_DEFAULT_CPU_REQUEST": config["executor-default-cpu-request"],
             "EXECUTOR_DEFAULT_MEMORY_LIMIT": config["executor-default-memory-limit"],
-            "EXECUTOR_DEFAULT_MEMORY_REQUEST": config[
-                "executor-default-memory-request"
-            ],
+            "EXECUTOR_DEFAULT_MEMORY_REQUEST": config["executor-default-memory-request"],
             "EXECUTOR_PROMETHEUS_PATH": config["executor-prometheus-path"],
             "EXECUTOR_REQUEST_LOGGER_DEFAULT_ENDPOINT": config[
                 "executor-request-logger-default-endpoint"
             ],
-            "EXECUTOR_SERVER_METRICS_PORT_NAME": config[
-                "executor-server-metrics-port-name"
-            ],
+            "EXECUTOR_SERVER_METRICS_PORT_NAME": config["executor-server-metrics-port-name"],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
             "ISTIO_ENABLED": str(bool(self.model.relations["istio"])).lower(),
             "ISTIO_GATEWAY": config["istio-gateway"],
@@ -230,18 +202,14 @@ class SeldonCoreOperator(CharmBase):
             "PREDICTIVE_UNIT_DEFAULT_ENV_SECRET_REF_NAME": config[
                 "predictive-unit-default-env-secret-ref-name"
             ],
-            "PREDICTIVE_UNIT_METRICS_PORT_NAME": config[
-                "predictive-unit-metrics-port-name"
-            ],
+            "PREDICTIVE_UNIT_METRICS_PORT_NAME": config["predictive-unit-metrics-port-name"],
             "PREDICTIVE_UNIT_SERVICE_PORT": config["predictive-unit-service-port"],
             "RELATED_IMAGE_EXECUTOR": config["related-image-executor"],
             "RELATED_IMAGE_EXPLAINER": config["related-image-explainer"],
             "RELATED_IMAGE_MLFLOWSERVER": config["related-image-mlflowserver"],
             "RELATED_IMAGE_MOCK_CLASSIFIER": config["related-image-mock-classifier"],
             "RELATED_IMAGE_SKLEARNSERVER": config["related-image-sklearnserver"],
-            "RELATED_IMAGE_STORAGE_INITIALIZER": config[
-                "related-image-storage-initializer"
-            ],
+            "RELATED_IMAGE_STORAGE_INITIALIZER": config["related-image-storage-initializer"],
             "RELATED_IMAGE_TENSORFLOW": config["related-image-tensorflow"],
             "RELATED_IMAGE_TFPROXY": config["related-image-tfproxy"],
             "RELATED_IMAGE_XGBOOSTSERVER": config["related-image-xgboostserver"],
@@ -250,12 +218,9 @@ class SeldonCoreOperator(CharmBase):
         }
         return ret_env_vars
 
-    #
-    # Pebble framework layer.
-    #
     @property
     def _seldon_core_operator_layer(self) -> Layer:
-
+        """Create and return Pebble framework layer."""
         env_vars = self._get_env_vars()
 
         layer_config = {
@@ -274,12 +239,10 @@ class SeldonCoreOperator(CharmBase):
 
         return Layer(layer_config)
 
-    #
-    # Check if connection can be made with container
-    #
     def _check_container_connection(self):
+        """Check if connection can be made with container."""
         if not self.container.can_connect():
-            raise CheckFailed("Pod startup is not complete", MaintenanceStatus)
+            raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
 
     #
     # Check for leader
@@ -287,31 +250,26 @@ class SeldonCoreOperator(CharmBase):
     def _check_leader(self):
         if not self.unit.is_leader():
             self.logger.info("Not a leader, skipping setup")
-            raise CheckFailed("Waiting for leadership", WaitingStatus)
+            raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
     #
     # Update Pebble configuration layer if changed.
     #
     def _update_layer(self) -> None:
-        """Updates the Pebble configuration layer if changed."""
+        """Update the Pebble configuration layer (if changed)."""
         current_layer = self.container.get_plan()
         new_layer = self._seldon_core_operator_layer
         if current_layer.services != new_layer.services:
             self.unit.status = MaintenanceStatus("Applying new pebble layer")
             self.container.add_layer(self._container_name, new_layer, combine=True)
             try:
-                self.logger.info(
-                    "Pebble plan updated with new configuration, replaning"
-                )
+                self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
             except ChangeError:
-                raise CheckFailed("Failed to replan", BlockedStatus)
+                raise ErrorWithStatus("Failed to replan", BlockedStatus)
 
-    #
-    # Upload certs to container
-    #
     def _upload_certs_to_container(self):
-
+        """Upload generated certs to container."""
         self.container.push(
             "/tmp/k8s-webhook-server/serving-certs/tls.key",
             self._stored.key,
@@ -328,53 +286,35 @@ class SeldonCoreOperator(CharmBase):
             make_dirs=True,
         )
 
-    #
-    # Deploy all K8S resouces
-    #
     def _deploy_k8s_resources(self) -> None:
+        """Deploys K8S resources."""
         try:
             self.unit.status = MaintenanceStatus("Creating K8S resources")
             self.k8s_resource_handler.apply()
             self.crd_resource_handler.apply()
             self.configmap_resource_handler.apply()
         except ApiError:
-            raise CheckFailed("K8S resources creation failed", BlockedStatus)
+            raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    #
-    # Main entry point for the Charm
-    #
-    def main(self, _) -> None:
+    def _on_install(self, _):
+        """Perform installation only actions."""
+        # upload certs to container
+        self._check_container_connection()
+        self._upload_certs_to_container()
 
-        try:
-            self._check_container_connection()
-            self._check_leader()
-            self._upload_certs_to_container()
-            self._deploy_k8s_resources()
-            self._update_layer()
-        except CheckFailed as error:
-            self.model.unit.status = error.status
-            return
+        # proceed with other actions
+        self.main(_)
 
-        self.model.unit.status = ActiveStatus()
-
-    #
-    # Remove all resouces
-    #
     def _on_remove(self, _):
+        """Remove all resources."""
         self.unit.status = MaintenanceStatus("Removing K8S resources")
         k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
         crd_resources_manifests = self.crd_resource_handler.render_manifests()
-        configmap_resources_manifests = (
-            self.configmap_resource_handler.render_manifests()
-        )
+        configmap_resources_manifests = self.configmap_resource_handler.render_manifests()
         try:
-            delete_many(
-                self.crd_resource_handler.lightkube_client, crd_resources_manifests
-            )
-            delete_many(
-                self.k8s_resource_handler.lightkube_client, k8s_resources_manifests
-            )
+            delete_many(self.crd_resource_handler.lightkube_client, crd_resources_manifests)
+            delete_many(self.k8s_resource_handler.lightkube_client, k8s_resources_manifests)
             delete_many(
                 self.configmap_resource_handler.lightkube_client,
                 configmap_resources_manifests,
@@ -384,29 +324,23 @@ class SeldonCoreOperator(CharmBase):
             raise e
         self.unit.status = MaintenanceStatus("K8S resources removed")
 
-    #
-    # Generate certificates
-    #
-    def gen_certs(self):
-
+    def _gen_certs(self):
+        """Generate certificates."""
         # generate SSL configuration based on template
         model = self.model.name
-        app = self.model.app.name
+
         try:
             ssl_conf_template = open(SSL_CONFIG_FILE)
             ssl_conf = ssl_conf_template.read()
         except ApiError as error:
             self.logger.warning(f"Failed to open SSL config file: {error}")
 
-        ssl_conf = ssl_conf.replace("{{ app }}", str(app))
         ssl_conf = ssl_conf.replace("{{ model }}", str(model))
         Path("/tmp/seldon-cert-gen-ssl.conf").write_text(ssl_conf)
 
         # execute OpenSSL commands
         check_call(["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-ca.key", "2048"])
-        check_call(
-            ["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-server.key", "2048"]
-        )
+        check_call(["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-server.key", "2048"])
         check_call(
             [
                 "openssl",
@@ -473,6 +407,22 @@ class SeldonCoreOperator(CharmBase):
         check_call(["rm", "-f", "/tmp/seldon-cert-gen-*"])
 
         return ret_certs
+
+    #
+    # Main entry point for the Charm
+    #
+    def main(self, _) -> None:
+        """Parform all required actions the Charm."""
+        try:
+            self._check_container_connection()
+            self._check_leader()
+            self._deploy_k8s_resources()
+            self._update_layer()
+        except ErrorWithStatus as error:
+            self.model.unit.status = error.status
+            return
+
+        self.model.unit.status = ActiveStatus()
 
 
 #

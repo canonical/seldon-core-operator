@@ -2,31 +2,30 @@
 # See LICENSE file for licensing details.
 #
 
-#
-# Unit tests for Seldon Core Operator/Charm
-#
-from unittest.mock import patch, MagicMock
+"""Unit tests for Seldon Core Operator/Charm."""
+
+import json
+from unittest.mock import MagicMock, patch
 
 import pytest
-import json
-
-from ops.model import ActiveStatus, WaitingStatus, MaintenanceStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Harness
+
 from charm import SeldonCoreOperator
 
 
 @pytest.fixture(scope="function")
 def harness() -> Harness:
+    """Create and return Harness for testing."""
     return Harness(SeldonCoreOperator)
 
 
-#
-# Test class for SeldonCoreOperator
-#
 class TestCharm:
+    """Test class for SeldonCoreOperator."""
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     def test_not_leader(self, harness: Harness):
+        """Test not a leader scenario."""
         # setup container netwroking simulation
         harness.set_can_connect("seldon-core", True)
         harness.container_pebble_ready("seldon-core")
@@ -43,8 +42,9 @@ class TestCharm:
         _: MagicMock,  # k8s_resource_handler
         __: MagicMock,  # configmap_resource_handler
         ___: MagicMock,  # crd_resource_handler
-        harness: Harness
+        harness: Harness,
     ):
+        """Test no relation scenario."""
         harness.set_leader(True)
         harness.add_oci_resource(
             "oci-image",
@@ -64,6 +64,7 @@ class TestCharm:
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     def test_prometheus_data_set(self, harness: Harness, mocker):
+        """Test Prometheus data setting."""
         harness.set_leader(True)
         harness.set_model_name("test_kubeflow")
         harness.begin()
@@ -76,9 +77,7 @@ class TestCharm:
             "bind-addresses": [
                 {
                     "interface-name": "eth0",
-                    "addresses": [
-                        {"hostname": "cassandra-tester-0", "value": bind_address}
-                    ],
+                    "addresses": [{"hostname": "cassandra-tester-0", "value": bind_address}],
                 }
             ]
         }
@@ -90,10 +89,6 @@ class TestCharm:
             harness.get_relation_data(rel_id, harness.model.app.name)["scrape_jobs"]
         )[0]["static_configs"][0]["targets"] == ["*:8080"]
 
-    #
-    # Test Pebble layer
-    # Only testing specific items
-    #
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
@@ -103,8 +98,9 @@ class TestCharm:
         _: MagicMock,  # k8s_resource_handler
         __: MagicMock,  # configmap_resource_handler
         ___: MagicMock,  # crd_resource_handler
-        harness: Harness
+        harness: Harness,
     ):
+        """Test creation of Pebble layer. Only testing specific items."""
         harness.set_leader(True)
         harness.set_model_name("test_kubeflow")
 
@@ -117,17 +113,16 @@ class TestCharm:
         assert pebble_plan
         assert pebble_plan._services
         pebble_plan_info = pebble_plan.to_dict()
-        assert pebble_plan_info['services']['seldon-core']['command'] == "/manager " \
-            "--enable-leader-election " \
+        assert (
+            pebble_plan_info["services"]["seldon-core"]["command"] == "/manager "
+            "--enable-leader-election "
             f"--webhook-port {harness.charm._webhook_port} "
-        test_env = pebble_plan_info['services']['seldon-core']['environment']
+        )
+        test_env = pebble_plan_info["services"]["seldon-core"]["environment"]
         # there should be 36 environment variables
         assert 36 == len(test_env)
-        assert "test_kubeflow" == test_env['POD_NAMESPACE']
+        assert "test_kubeflow" == test_env["POD_NAMESPACE"]
 
-    #
-    # Test if K8S resource handler is executed as expected
-    #
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
@@ -139,6 +134,7 @@ class TestCharm:
         crd_resource_handler: MagicMock,
         harness: Harness,
     ):
+        """Test if K8S resource handler is executed as expected."""
         harness.begin()
         harness.charm._deploy_k8s_resources()
         crd_resource_handler.apply.assert_called()
@@ -148,12 +144,13 @@ class TestCharm:
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     def test_get_certs(self, harness: Harness):
+        """Test certs generation."""
         # setup container netwroking simulation
         harness.set_can_connect("seldon-core", True)
         harness.begin()
 
         # obtain certs and verify contents
-        cert_info = harness.charm.gen_certs()
+        cert_info = harness.charm._gen_certs()
         ssl_conf = open("/tmp/seldon-cert-gen-ssl.conf").read()
         assert ssl_conf is not None
         assert "{{ app }}" not in ssl_conf

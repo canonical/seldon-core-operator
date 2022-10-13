@@ -1,5 +1,11 @@
-import time
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
+
+"""Integration tests for Seldon Core Operator/Charm."""
+
 import logging
+import time
 from pathlib import Path
 
 import pytest
@@ -7,7 +13,7 @@ import requests
 import yaml
 from lightkube import Client
 from lightkube.generic_resource import create_namespaced_resource
-from lightkube.resources.core_v1 import Service, Namespace
+from lightkube.resources.core_v1 import Namespace, Service
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -37,6 +43,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 
 async def test_seldon_deployment(ops_test: OpsTest):
+    """Test Seldon Deployment scenario."""
     namespace = ops_test.model_name
     client = Client()
 
@@ -44,7 +51,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    SeldonDeployment = create_namespaced_resource(
+    seldon_deployment = create_namespaced_resource(
         group="machinelearning.seldon.io",
         version="v1",
         kind="seldondeployment",
@@ -53,11 +60,11 @@ async def test_seldon_deployment(ops_test: OpsTest):
     )
 
     with open("examples/serve-simple-v1.yaml") as f:
-        sdep = SeldonDeployment(yaml.safe_load(f.read()))
+        sdep = seldon_deployment(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
     for i in range(30):
-        dep = client.get(SeldonDeployment, "seldon-model", namespace=namespace)
+        dep = client.get(seldon_deployment, "seldon-model", namespace=namespace)
         state = dep.get("status", {}).get("state")
 
         if state == "Available":
