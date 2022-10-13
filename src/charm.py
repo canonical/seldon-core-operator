@@ -244,17 +244,12 @@ class SeldonCoreOperator(CharmBase):
         if not self.container.can_connect():
             raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
 
-    #
-    # Check for leader
-    #
     def _check_leader(self):
+        """Check if this unit is a leader."""
         if not self.unit.is_leader():
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    #
-    # Update Pebble configuration layer if changed.
-    #
     def _update_layer(self) -> None:
         """Update the Pebble configuration layer (if changed)."""
         current_layer = self.container.get_plan()
@@ -412,7 +407,7 @@ class SeldonCoreOperator(CharmBase):
     # Main entry point for the Charm
     #
     def main(self, _) -> None:
-        """Parform all required actions the Charm."""
+        """Perform all required actions the Charm."""
         try:
             self._check_container_connection()
             self._check_leader()

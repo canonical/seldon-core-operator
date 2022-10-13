@@ -1,10 +1,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-lightkube==0.11.0
 black
 flake8 < 4.1
 jinja2 < 3.1
-pytest < 6.3
+lightkube==0.11.0
+pytest
 pytest-mock
 requests < 2.28
