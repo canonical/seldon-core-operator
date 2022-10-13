@@ -79,7 +79,7 @@ class SeldonCoreOperator(CharmBase):
         self._container_name = "seldon-core"
         self._container = self.unit.get_container(self._container_name)
 
-        # setup context to be used for updating K8S resouces
+        # setup context to be used for updating K8S resources
         self._context = {
             "app_name": self._name,
             "namespace": self._namespace,
