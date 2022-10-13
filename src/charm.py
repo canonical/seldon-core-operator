@@ -329,7 +329,7 @@ class SeldonCoreOperator(CharmBase):
         )
 
     #
-    # Deploy all K8S resouces
+    # Deploy all K8S resources
     #
     def _deploy_k8s_resources(self) -> None:
         try:
