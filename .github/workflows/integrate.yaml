@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check libs
-        uses: canonical/charming-actions/check-libraries@2.0.0-rc
+        uses: canonical/charming-actions/check-libraries@2.1.0
         with:
           credentials: "${{ secrets.charmcraft-credentials }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -59,11 +59,13 @@ jobs:
     - name: Check out repo
       uses: actions/checkout@v2
 
-    - name: Setup uperator environment
+    - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
       with:
         provider: microk8s
         channel: 1.22/stable
+        # Pinned until this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833
+        bootstrap-options: "--agent-version=2.9.34"
 
     - name: Run integration tests
       run: tox -vve integration -- --model testing
