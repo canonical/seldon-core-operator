@@ -55,7 +55,7 @@ class TestCharm:
             },
         )
 
-        # setup container netwroking simulation
+        # setup container networking simulation
         harness.set_can_connect("seldon-core", True)
         harness.container_pebble_ready("seldon-core")
 
