@@ -6,6 +6,7 @@
 """A Juju Charm for Seldon Core Operator."""
 
 import logging
+import tempfile
 from base64 import b64encode
 from pathlib import Path
 from subprocess import check_call
@@ -331,81 +332,81 @@ class SeldonCoreOperator(CharmBase):
             self.logger.warning(f"Failed to open SSL config file: {error}")
 
         ssl_conf = ssl_conf.replace("{{ model }}", str(model))
-        Path("/tmp/seldon-cert-gen-ssl.conf").write_text(ssl_conf)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir + "/seldon-cert-gen-ssl.conf").write_text(ssl_conf)
 
-        # execute OpenSSL commands
-        check_call(["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-ca.key", "2048"])
-        check_call(["openssl", "genrsa", "-out", "/tmp/seldon-cert-gen-server.key", "2048"])
-        check_call(
-            [
-                "openssl",
-                "req",
-                "-x509",
-                "-new",
-                "-sha256",
-                "-nodes",
-                "-days",
-                "3650",
-                "-key",
-                "/tmp/seldon-cert-gen-ca.key",
-                "-subj",
-                "/CN=127.0.0.1",
-                "-out",
-                "/tmp/seldon-cert-gen-ca.crt",
-            ]
-        )
-        check_call(
-            [
-                "openssl",
-                "req",
-                "-new",
-                "-sha256",
-                "-key",
-                "/tmp/seldon-cert-gen-server.key",
-                "-out",
-                "/tmp/seldon-cert-gen-server.csr",
-                "-config",
-                "/tmp/seldon-cert-gen-ssl.conf",
-            ]
-        )
-        check_call(
-            [
-                "openssl",
-                "x509",
-                "-req",
-                "-sha256",
-                "-in",
-                "/tmp/seldon-cert-gen-server.csr",
-                "-CA",
-                "/tmp/seldon-cert-gen-ca.crt",
-                "-CAkey",
-                "/tmp/seldon-cert-gen-ca.key",
-                "-CAcreateserial",
-                "-out",
-                "/tmp/seldon-cert-gen-cert.pem",
-                "-days",
-                "365",
-                "-extensions",
-                "v3_ext",
-                "-extfile",
-                "/tmp/seldon-cert-gen-ssl.conf",
-            ]
-        )
+            # execute OpenSSL commands
+            check_call(["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-ca.key", "2048"])
+            check_call(
+                ["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-server.key", "2048"]
+            )
+            check_call(
+                [
+                    "openssl",
+                    "req",
+                    "-x509",
+                    "-new",
+                    "-sha256",
+                    "-nodes",
+                    "-days",
+                    "3650",
+                    "-key",
+                    tmp_dir + "/seldon-cert-gen-ca.key",
+                    "-subj",
+                    "/CN=127.0.0.1",
+                    "-out",
+                    tmp_dir + "/seldon-cert-gen-ca.crt",
+                ]
+            )
+            check_call(
+                [
+                    "openssl",
+                    "req",
+                    "-new",
+                    "-sha256",
+                    "-key",
+                    tmp_dir + "/seldon-cert-gen-server.key",
+                    "-out",
+                    tmp_dir + "/seldon-cert-gen-server.csr",
+                    "-config",
+                    tmp_dir + "/seldon-cert-gen-ssl.conf",
+                ]
+            )
+            check_call(
+                [
+                    "openssl",
+                    "x509",
+                    "-req",
+                    "-sha256",
+                    "-in",
+                    tmp_dir + "/seldon-cert-gen-server.csr",
+                    "-CA",
+                    tmp_dir + "/seldon-cert-gen-ca.crt",
+                    "-CAkey",
+                    tmp_dir + "/seldon-cert-gen-ca.key",
+                    "-CAcreateserial",
+                    "-out",
+                    tmp_dir + "/seldon-cert-gen-cert.pem",
+                    "-days",
+                    "365",
+                    "-extensions",
+                    "v3_ext",
+                    "-extfile",
+                    tmp_dir + "/seldon-cert-gen-ssl.conf",
+                ]
+            )
 
-        ret_certs = {
-            "cert": Path("/tmp/seldon-cert-gen-cert.pem").read_text(),
-            "key": Path("/tmp/seldon-cert-gen-server.key").read_text(),
-            "ca": Path("/tmp/seldon-cert-gen-ca.crt").read_text(),
-        }
+            ret_certs = {
+                "cert": Path(tmp_dir + "/seldon-cert-gen-cert.pem").read_text(),
+                "key": Path(tmp_dir + "/seldon-cert-gen-server.key").read_text(),
+                "ca": Path(tmp_dir + "/seldon-cert-gen-ca.crt").read_text(),
+            }
 
-        # cleanup temporary files
-        check_call(["rm", "-f", "/tmp/seldon-cert-gen-*"])
+            # cleanup temporary files
+            check_call(["rm", "-f", tmp_dir + "/seldon-cert-gen-*"])
 
         return ret_certs
 
-    #
-    # Main entry point for the Charm
-    #
     def main(self, _) -> None:
         """Perform all required actions the Charm."""
         try:

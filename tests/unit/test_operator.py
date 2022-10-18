@@ -17,7 +17,12 @@ from charm import SeldonCoreOperator
 @pytest.fixture(scope="function")
 def harness() -> Harness:
     """Create and return Harness for testing."""
-    return Harness(SeldonCoreOperator)
+    harness = Harness(SeldonCoreOperator)
+
+    # setup container networking simulation
+    harness.set_can_connect("seldon-core", True)
+
+    return harness
 
 
 class TestCharm:
@@ -26,11 +31,8 @@ class TestCharm:
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     def test_not_leader(self, harness: Harness):
         """Test not a leader scenario."""
-        # setup container netwroking simulation
-        harness.set_can_connect("seldon-core", True)
-        harness.container_pebble_ready("seldon-core")
-
         harness.begin_with_initial_hooks()
+        harness.container_pebble_ready("seldon-core")
         assert harness.charm.model.unit.status == WaitingStatus("Waiting for leadership")
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
@@ -55,11 +57,8 @@ class TestCharm:
             },
         )
 
-        # setup container networking simulation
-        harness.set_can_connect("seldon-core", True)
-        harness.container_pebble_ready("seldon-core")
-
         harness.begin_with_initial_hooks()
+        harness.container_pebble_ready("seldon-core")
         assert harness.charm.model.unit.status == ActiveStatus("")
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
@@ -103,12 +102,8 @@ class TestCharm:
         """Test creation of Pebble layer. Only testing specific items."""
         harness.set_leader(True)
         harness.set_model_name("test_kubeflow")
-
-        # setup container netwroking simulation
-        harness.set_can_connect("seldon-core", True)
-        harness.container_pebble_ready("seldon-core")
-
         harness.begin_with_initial_hooks()
+        harness.container_pebble_ready("seldon-core")
         pebble_plan = harness.get_container_pebble_plan("seldon-core")
         assert pebble_plan
         assert pebble_plan._services
@@ -145,16 +140,10 @@ class TestCharm:
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     def test_get_certs(self, harness: Harness):
         """Test certs generation."""
-        # setup container netwroking simulation
-        harness.set_can_connect("seldon-core", True)
         harness.begin()
 
         # obtain certs and verify contents
         cert_info = harness.charm._gen_certs()
-        ssl_conf = open("/tmp/seldon-cert-gen-ssl.conf").read()
-        assert ssl_conf is not None
-        assert "{{ app }}" not in ssl_conf
-        assert "{{ model }}" not in ssl_conf
         assert cert_info is not None
         assert len(cert_info) == 3
         for cert in cert_info.items():
