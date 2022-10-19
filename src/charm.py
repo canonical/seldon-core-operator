@@ -1,88 +1,185 @@
 #!/usr/bin/env python3
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
+#
+
+"""A Juju Charm for Seldon Core Operator."""
 
 import logging
+import tempfile
+from base64 import b64encode
+from pathlib import Path
+from subprocess import check_call
 
-from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
+from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from jinja2 import Environment, FileSystemLoader
+from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from lightkube import ApiError
+from lightkube.generic_resource import load_in_cluster_generic_resources
+from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
+from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.pebble import ChangeError, Layer
 
-from oci_image import OCIImageResource, OCIImageResourceError
+K8S_RESOURCE_FILES = [
+    "src/templates/auth_manifests.yaml.j2",
+    "src/templates/validate.yaml.j2",
+    "src/templates/webhook-service.yaml.j2",
+]
+CRD_RESOURCE_FILES = [
+    "src/templates/crd-v1.yaml.j2",
+]
+CONFIGMAP_RESOURCE_FILES = [
+    "src/templates/configmap.yaml.j2",
+]
+SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 
-log = logging.getLogger()
 
+class SeldonCoreOperator(CharmBase):
+    """A Juju Charm for Seldon Core Operator."""
 
-class Operator(CharmBase):
+    _stored = StoredState()
+
     def __init__(self, *args):
+        """Initialize charm and setup the container."""
         super().__init__(*args)
 
-        self.image = OCIImageResource(self, "oci-image")
+        # retrieve configuration and base settings
+        self.logger = logging.getLogger(__name__)
+        self._namespace = self.model.name
+        self._lightkube_field_manager = "lightkube"
+        self._name = self.model.app.name
+        self._metrics_port = self.model.config["metrics-port"]
+        self._webhook_port = self.model.config["webhook-port"]
+        self._exec_command = (
+            "/manager " "--enable-leader-election " f"--webhook-port {self._webhook_port} "
+        )
+        self._container_name = "seldon-core"
+        self._container = self.unit.get_container(self._container_name)
 
-        self.framework.observe(self.on.install, self.set_pod_spec)
-        self.framework.observe(self.on.upgrade_charm, self.set_pod_spec)
-        self.framework.observe(self.on.config_changed, self.set_pod_spec)
-        self.framework.observe(self.on.leader_elected, self.set_pod_spec)
+        # generate certs
+        self._stored.set_default(**self._gen_certs())
+
+        # setup context to be used for updating K8S resources
+        self._context = {
+            "app_name": self._name,
+            "namespace": self._namespace,
+            "service": self._name,
+            "webhook_port": self._webhook_port,
+            "ca_bundle": b64encode(self._stored.ca.encode("ascii")).decode("utf-8"),
+        }
+        self._k8s_resource_handler = None
+        self._crd_resource_handler = None
+        self._configmap_resource_handler = None
+
+        metrics_port = ServicePort(int(self._metrics_port), name="metrics-port")
+        webhook_port = ServicePort(int(self._webhook_port), name="webhook-port")
+        self.service_patcher = KubernetesServicePatch(
+            self,
+            [metrics_port, webhook_port],
+            service_name=f"{self.model.app.name}",
+        )
+
+        # setup events
+        self.framework.observe(self.on.upgrade_charm, self.main)
+        self.framework.observe(self.on.config_changed, self.main)
+        self.framework.observe(self.on.leader_elected, self.main)
+        self.framework.observe(self.on.seldon_core_pebble_ready, self.main)
 
         for rel in self.model.relations.keys():
-            self.framework.observe(
-                self.on[rel].relation_changed,
-                self.set_pod_spec,
-            )
+            self.framework.observe(self.on[rel].relation_changed, self.main)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.remove, self._on_remove)
 
+        # Prometheus related config
         self.prometheus_provider = MetricsEndpointProvider(
             charm=self,
             relation_name="metrics-endpoint",
             jobs=[
                 {
                     "metrics_path": self.config["executor-server-metrics-port-name"],
-                    "static_configs": [
-                        {"targets": ["*:{}".format(self.config["metrics-port"])]}
-                    ],
+                    "static_configs": [{"targets": ["*:{}".format(self.config["metrics-port"])]}],
                 }
             ],
         )
 
+        # Dashboard related config (Grafana)
         self.dashboard_provider = GrafanaDashboardProvider(
             charm=self,
             relation_name="grafana-dashboard",
         )
 
-    def set_pod_spec(self, event):
-        try:
-            self._check_leader()
-        except CheckFailed as error:
-            self.model.unit.status = error.status
-            return
+    @property
+    def container(self):
+        """Return container."""
+        return self._container
 
-        try:
-            image_details = self.image.fetch()
-        except OCIImageResourceError as e:
-            self.model.unit.status = e.status
-            log.info(e)
-            return
+    @property
+    def k8s_resource_handler(self):
+        """Update K8S with K8S resources."""
+        if not self._k8s_resource_handler:
+            self._k8s_resource_handler = KubernetesResourceHandler(
+                field_manager=self._lightkube_field_manager,
+                template_files=K8S_RESOURCE_FILES,
+                context=self._context,
+                logger=self.logger,
+            )
+        load_in_cluster_generic_resources(self._k8s_resource_handler.lightkube_client)
+        return self._k8s_resource_handler
 
+    @k8s_resource_handler.setter
+    def k8s_resource_handler(self, handler: KubernetesResourceHandler):
+        self._k8s_resource_handler = handler
+
+    @property
+    def crd_resource_handler(self):
+        """Update K8S with CRD resources."""
+        if not self._crd_resource_handler:
+            self._crd_resource_handler = KubernetesResourceHandler(
+                field_manager=self._lightkube_field_manager,
+                template_files=CRD_RESOURCE_FILES,
+                context=self._context,
+                logger=self.logger,
+            )
+        load_in_cluster_generic_resources(self._crd_resource_handler.lightkube_client)
+        return self._crd_resource_handler
+
+    @crd_resource_handler.setter
+    def crd_resource_handler(self, handler: KubernetesResourceHandler):
+        self._crd_resource_handler = handler
+
+    @property
+    def configmap_resource_handler(self):
+        """Update K8S with ConfigMap resources."""
+        if not self._configmap_resource_handler:
+            self._configmap_resource_handler = KubernetesResourceHandler(
+                field_manager=self._lightkube_field_manager,
+                template_files=CONFIGMAP_RESOURCE_FILES,
+                context=self._context,
+                logger=self.logger,
+            )
+        load_in_cluster_generic_resources(self._configmap_resource_handler.lightkube_client)
+        return self._configmap_resource_handler
+
+    @configmap_resource_handler.setter
+    def configmap_resource_handler(self, handler: KubernetesResourceHandler):
+        self._configmap_resource_handler = handler
+
+    def _get_env_vars(self):
+        """Return environment variables based on model configuration."""
         config = self.model.config
-        tconfig = {k.replace("-", "_"): v for k, v in config.items()}
-        tconfig["service"] = self.model.app.name
-        tconfig["namespace"] = self.model.name
-        env = Environment(
-            loader=FileSystemLoader("src/templates/"),
-        )
-        envs = {
+        ret_env_vars = {
             "AMBASSADOR_ENABLED": str(bool(self.model.relations["ambassador"])).lower(),
-            "AMBASSADOR_SINGLE_NAMESPACE": str(
-                config["ambassador-single-namespace"]
-            ).lower(),
+            "AMBASSADOR_SINGLE_NAMESPACE": str(config["ambassador-single-namespace"]).lower(),
             "CONTROLLER_ID": config["controller-id"],
             "DEFAULT_USER_ID": config["default-user-id"],
-            "EXECUTOR_CONTAINER_IMAGE_AND_VERSION": config[
-                "executor-container-image-and-version"
-            ],
-            "EXECUTOR_CONTAINER_IMAGE_PULL_POLICY": config[
-                "executor-container-image-pull-policy"
-            ],
+            "EXECUTOR_CONTAINER_IMAGE_AND_VERSION": config["executor-container-image-and-version"],
+            "EXECUTOR_CONTAINER_IMAGE_PULL_POLICY": config["executor-container-image-pull-policy"],
             "EXECUTOR_CONTAINER_SERVICE_ACCOUNT_NAME": config[
                 "executor-container-service-account-name"
             ],
@@ -90,16 +187,12 @@ class Operator(CharmBase):
             "EXECUTOR_DEFAULT_CPU_LIMIT": config["executor-default-cpu-limit"],
             "EXECUTOR_DEFAULT_CPU_REQUEST": config["executor-default-cpu-request"],
             "EXECUTOR_DEFAULT_MEMORY_LIMIT": config["executor-default-memory-limit"],
-            "EXECUTOR_DEFAULT_MEMORY_REQUEST": config[
-                "executor-default-memory-request"
-            ],
+            "EXECUTOR_DEFAULT_MEMORY_REQUEST": config["executor-default-memory-request"],
             "EXECUTOR_PROMETHEUS_PATH": config["executor-prometheus-path"],
             "EXECUTOR_REQUEST_LOGGER_DEFAULT_ENDPOINT": config[
                 "executor-request-logger-default-endpoint"
             ],
-            "EXECUTOR_SERVER_METRICS_PORT_NAME": config[
-                "executor-server-metrics-port-name"
-            ],
+            "EXECUTOR_SERVER_METRICS_PORT_NAME": config["executor-server-metrics-port-name"],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
             "ISTIO_ENABLED": str(bool(self.model.relations["istio"])).lower(),
             "ISTIO_GATEWAY": config["istio-gateway"],
@@ -110,335 +203,226 @@ class Operator(CharmBase):
             "PREDICTIVE_UNIT_DEFAULT_ENV_SECRET_REF_NAME": config[
                 "predictive-unit-default-env-secret-ref-name"
             ],
-            "PREDICTIVE_UNIT_METRICS_PORT_NAME": config[
-                "predictive-unit-metrics-port-name"
-            ],
+            "PREDICTIVE_UNIT_METRICS_PORT_NAME": config["predictive-unit-metrics-port-name"],
             "PREDICTIVE_UNIT_SERVICE_PORT": config["predictive-unit-service-port"],
             "RELATED_IMAGE_EXECUTOR": config["related-image-executor"],
             "RELATED_IMAGE_EXPLAINER": config["related-image-explainer"],
             "RELATED_IMAGE_MLFLOWSERVER": config["related-image-mlflowserver"],
             "RELATED_IMAGE_MOCK_CLASSIFIER": config["related-image-mock-classifier"],
             "RELATED_IMAGE_SKLEARNSERVER": config["related-image-sklearnserver"],
-            "RELATED_IMAGE_STORAGE_INITIALIZER": config[
-                "related-image-storage-initializer"
-            ],
+            "RELATED_IMAGE_STORAGE_INITIALIZER": config["related-image-storage-initializer"],
             "RELATED_IMAGE_TENSORFLOW": config["related-image-tensorflow"],
             "RELATED_IMAGE_TFPROXY": config["related-image-tfproxy"],
             "RELATED_IMAGE_XGBOOSTSERVER": config["related-image-xgboostserver"],
             "USE_EXECUTOR": str(config["use-executor"]).lower(),
             "WATCH_NAMESPACE": config["watch-namespace"],
         }
+        return ret_env_vars
 
-        self.model.unit.status = MaintenanceStatus("Setting pod spec")
-        self.model.pod.set_spec(
-            {
-                "version": 3,
-                "serviceAccount": {
-                    "roles": [
-                        {
-                            "global": True,
-                            "rules": [
-                                {
-                                    "apiGroups": ["coordination.k8s.io"],
-                                    "resources": ["leases"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": [""],
-                                    "resources": ["events"],
-                                    "verbs": ["create", "patch"],
-                                },
-                                {
-                                    "apiGroups": [""],
-                                    "resources": ["namespaces"],
-                                    "verbs": ["get", "list", "watch"],
-                                },
-                                {
-                                    "apiGroups": [""],
-                                    "resources": ["services"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["apps"],
-                                    "resources": ["deployments"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["apps"],
-                                    "resources": ["deployments/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["autoscaling"],
-                                    "resources": ["horizontalpodautoscalers"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["autoscaling"],
-                                    "resources": ["horizontalpodautoscalers/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["keda.sh"],
-                                    "resources": ["scaledobjects"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["keda.sh"],
-                                    "resources": ["scaledobjects/finalizers"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["keda.sh"],
-                                    "resources": ["scaledobjects/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["machinelearning.seldon.io"],
-                                    "resources": ["seldondeployments"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["machinelearning.seldon.io"],
-                                    "resources": ["seldondeployments/finalizers"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["machinelearning.seldon.io"],
-                                    "resources": ["seldondeployments/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["networking.istio.io"],
-                                    "resources": ["destinationrules"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["networking.istio.io"],
-                                    "resources": ["destinationrules/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["networking.istio.io"],
-                                    "resources": ["virtualservices"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["networking.istio.io"],
-                                    "resources": ["virtualservices/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["policy"],
-                                    "resources": ["poddisruptionbudgets"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["policy"],
-                                    "resources": ["poddisruptionbudgets/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["v1"],
-                                    "resources": ["namespaces"],
-                                    "verbs": ["get", "list", "watch"],
-                                },
-                                {
-                                    "apiGroups": ["v1"],
-                                    "resources": ["services"],
-                                    "verbs": [
-                                        "create",
-                                        "delete",
-                                        "get",
-                                        "list",
-                                        "patch",
-                                        "update",
-                                        "watch",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": ["v1"],
-                                    "resources": ["services/status"],
-                                    "verbs": ["get", "patch", "update"],
-                                },
-                                {
-                                    "apiGroups": ["apiextensions.k8s.io"],
-                                    "resources": ["customresourcedefinitions"],
-                                    "verbs": ["create", "get", "list"],
-                                },
-                                {
-                                    "apiGroups": ["admissionregistration.k8s.io"],
-                                    "resources": ["validatingwebhookconfigurations"],
-                                    "verbs": [
-                                        "get",
-                                        "list",
-                                        "create",
-                                        "delete",
-                                        "update",
-                                    ],
-                                },
-                                {
-                                    "apiGroups": [""],
-                                    "resources": ["configmaps"],
-                                    "verbs": [
-                                        "get",
-                                        "list",
-                                        "watch",
-                                        "create",
-                                        "update",
-                                        "patch",
-                                        "delete",
-                                    ],
-                                },
-                            ],
-                        }
-                    ]
-                },
-                "containers": [
-                    {
-                        "name": "seldon-core",
-                        "command": ["/manager"],
-                        "args": [
-                            "--enable-leader-election",
-                            "--webhook-port",
-                            config["webhook-port"],
-                            "--create-resources",
-                            "true",
-                        ],
-                        "imageDetails": image_details,
-                        "ports": [
-                            {
-                                "name": "metrics",
-                                "containerPort": int(config["metrics-port"]),
-                            },
-                            {
-                                "name": "webhook",
-                                "containerPort": int(config["webhook-port"]),
-                            },
-                        ],
-                        "envConfig": envs,
-                        "volumeConfig": [
-                            {
-                                "name": "operator-resources",
-                                "mountPath": "/tmp/operator-resources",
-                                "files": [
-                                    {
-                                        "path": f"{name}.yaml",
-                                        "content": env.get_template(
-                                            f"{name}.yaml"
-                                        ).render(tconfig),
-                                    }
-                                    for name in (
-                                        "configmap",
-                                        "crd-v1",
-                                        "service",
-                                        "validate",
-                                    )
-                                ],
-                            }
-                        ],
-                    }
-                ],
+    @property
+    def _seldon_core_operator_layer(self) -> Layer:
+        """Create and return Pebble framework layer."""
+        env_vars = self._get_env_vars()
+
+        layer_config = {
+            "summary": "seldon-core-operator layer",
+            "description": "Pebble config layer for seldon-core-operator",
+            "services": {
+                self._container_name: {
+                    "override": "replace",
+                    "summary": "Entrypoint of seldon-core-operator image",
+                    "command": self._exec_command,
+                    "startup": "enabled",
+                    "environment": env_vars,
+                }
             },
-        )
-        self.model.unit.status = ActiveStatus()
+        }
+
+        return Layer(layer_config)
+
+    def _check_container_connection(self):
+        """Check if connection can be made with container."""
+        if not self.container.can_connect():
+            raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
 
     def _check_leader(self):
+        """Check if this unit is a leader."""
         if not self.unit.is_leader():
-            log.info("Not a leader, skipping set_pod_spec")
-            raise CheckFailed("Waiting for leadership", WaitingStatus)
+            self.logger.info("Not a leader, skipping setup")
+            raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
+
+    def _update_layer(self) -> None:
+        """Update the Pebble configuration layer (if changed)."""
+        current_layer = self.container.get_plan()
+        new_layer = self._seldon_core_operator_layer
+        if current_layer.services != new_layer.services:
+            self.unit.status = MaintenanceStatus("Applying new pebble layer")
+            self.container.add_layer(self._container_name, new_layer, combine=True)
+            try:
+                self.logger.info("Pebble plan updated with new configuration, replaning")
+                self.container.replan()
+            except ChangeError:
+                raise ErrorWithStatus("Failed to replan", BlockedStatus)
+
+    def _upload_certs_to_container(self):
+        """Upload generated certs to container."""
+        self.container.push(
+            "/tmp/k8s-webhook-server/serving-certs/tls.key",
+            self._stored.key,
+            make_dirs=True,
+        )
+        self.container.push(
+            "/tmp/k8s-webhook-server/serving-certs/tls.crt",
+            self._stored.cert,
+            make_dirs=True,
+        )
+        self.container.push(
+            "/tmp/k8s-webhook-server/serving-certs/ca.crt",
+            self._stored.ca,
+            make_dirs=True,
+        )
+
+    def _deploy_k8s_resources(self) -> None:
+        """Deploys K8S resources."""
+        try:
+            self.unit.status = MaintenanceStatus("Creating K8S resources")
+            self.k8s_resource_handler.apply()
+            self.crd_resource_handler.apply()
+            self.configmap_resource_handler.apply()
+        except ApiError:
+            raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
+        self.model.unit.status = MaintenanceStatus("K8S resources created")
+
+    def _on_install(self, _):
+        """Perform installation only actions."""
+        # upload certs to container
+        self._check_container_connection()
+        self._upload_certs_to_container()
+
+        # proceed with other actions
+        self.main(_)
+
+    def _on_remove(self, _):
+        """Remove all resources."""
+        self.unit.status = MaintenanceStatus("Removing K8S resources")
+        k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
+        crd_resources_manifests = self.crd_resource_handler.render_manifests()
+        configmap_resources_manifests = self.configmap_resource_handler.render_manifests()
+        try:
+            delete_many(self.crd_resource_handler.lightkube_client, crd_resources_manifests)
+            delete_many(self.k8s_resource_handler.lightkube_client, k8s_resources_manifests)
+            delete_many(
+                self.configmap_resource_handler.lightkube_client,
+                configmap_resources_manifests,
+            )
+        except ApiError as e:
+            self.logger.warning(f"Failed to delete K8S resources, with error: {e}")
+            raise e
+        self.unit.status = MaintenanceStatus("K8S resources removed")
+
+    def _gen_certs(self):
+        """Generate certificates."""
+        # generate SSL configuration based on template
+        model = self.model.name
+
+        try:
+            ssl_conf_template = open(SSL_CONFIG_FILE)
+            ssl_conf = ssl_conf_template.read()
+        except ApiError as error:
+            self.logger.warning(f"Failed to open SSL config file: {error}")
+
+        ssl_conf = ssl_conf.replace("{{ model }}", str(model))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            Path(tmp_dir + "/seldon-cert-gen-ssl.conf").write_text(ssl_conf)
+
+            # execute OpenSSL commands
+            check_call(["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-ca.key", "2048"])
+            check_call(
+                ["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-server.key", "2048"]
+            )
+            check_call(
+                [
+                    "openssl",
+                    "req",
+                    "-x509",
+                    "-new",
+                    "-sha256",
+                    "-nodes",
+                    "-days",
+                    "3650",
+                    "-key",
+                    tmp_dir + "/seldon-cert-gen-ca.key",
+                    "-subj",
+                    "/CN=127.0.0.1",
+                    "-out",
+                    tmp_dir + "/seldon-cert-gen-ca.crt",
+                ]
+            )
+            check_call(
+                [
+                    "openssl",
+                    "req",
+                    "-new",
+                    "-sha256",
+                    "-key",
+                    tmp_dir + "/seldon-cert-gen-server.key",
+                    "-out",
+                    tmp_dir + "/seldon-cert-gen-server.csr",
+                    "-config",
+                    tmp_dir + "/seldon-cert-gen-ssl.conf",
+                ]
+            )
+            check_call(
+                [
+                    "openssl",
+                    "x509",
+                    "-req",
+                    "-sha256",
+                    "-in",
+                    tmp_dir + "/seldon-cert-gen-server.csr",
+                    "-CA",
+                    tmp_dir + "/seldon-cert-gen-ca.crt",
+                    "-CAkey",
+                    tmp_dir + "/seldon-cert-gen-ca.key",
+                    "-CAcreateserial",
+                    "-out",
+                    tmp_dir + "/seldon-cert-gen-cert.pem",
+                    "-days",
+                    "365",
+                    "-extensions",
+                    "v3_ext",
+                    "-extfile",
+                    tmp_dir + "/seldon-cert-gen-ssl.conf",
+                ]
+            )
+
+            ret_certs = {
+                "cert": Path(tmp_dir + "/seldon-cert-gen-cert.pem").read_text(),
+                "key": Path(tmp_dir + "/seldon-cert-gen-server.key").read_text(),
+                "ca": Path(tmp_dir + "/seldon-cert-gen-ca.crt").read_text(),
+            }
+
+            # cleanup temporary files
+            check_call(["rm", "-f", tmp_dir + "/seldon-cert-gen-*"])
+
+        return ret_certs
+
+    def main(self, _) -> None:
+        """Perform all required actions the Charm."""
+        try:
+            self._check_container_connection()
+            self._check_leader()
+            self._deploy_k8s_resources()
+            self._update_layer()
+        except ErrorWithStatus as error:
+            self.model.unit.status = error.status
+            return
+
+        self.model.unit.status = ActiveStatus()
 
 
-class CheckFailed(Exception):
-    """Raise this exception if one of the checks in main fails."""
-
-    def __init__(self, msg, status_type=None):
-        super().__init__()
-
-        self.msg = str(msg)
-        self.status_type = status_type
-        self.status = status_type(self.msg)
-
-
+#
+# Start main
+#
 if __name__ == "__main__":
-    main(Operator)
+    main(SeldonCoreOperator)

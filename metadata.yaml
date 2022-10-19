@@ -3,8 +3,9 @@ summary: Blazing Fast, Industry-Ready ML
 description: |
   An open source platform to deploy your machine learning models
   on Kubernetes at massive scale.
-series: [kubernetes]
-min-juju-version: "2.9.0"
+containers:
+  seldon-core:
+    resource: oci-image
 resources:
   oci-image:
     type: oci-image

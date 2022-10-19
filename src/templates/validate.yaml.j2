@@ -13,7 +13,7 @@ webhooks:
   - v1
   - v1beta1
   clientConfig:
-    caBundle: Cg==
+    caBundle: {{ ca_bundle }}
     service:
       name: seldon-webhook-service
       port: {{ webhook_port }}
