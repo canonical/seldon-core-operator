@@ -150,7 +150,14 @@ class TestCharm:
             assert len(str(cert[1])) != 0
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
-    def test_istio_relation(self, harness: Harness, mocker):
+    @patch("charm.SeldonCoreOperator.k8s_resource_handler")
+    @patch("charm.SeldonCoreOperator.configmap_resource_handler")
+    @patch("charm.SeldonCoreOperator.crd_resource_handler")
+    def test_istio_relation(self,
+        _: MagicMock,  # k8s_resource_handler
+        __: MagicMock,  # configmap_resource_handler
+        ___: MagicMock,  # crd_resource_handler
+	harness: Harness, mocker):
         """Test Istio relation addition."""
         harness.set_leader(True)
         test_model_name = "test-kubeflow"
