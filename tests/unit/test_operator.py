@@ -148,3 +148,24 @@ class TestCharm:
         assert len(cert_info) == 3
         for cert in cert_info.items():
             assert len(str(cert[1])) != 0
+
+    @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
+    def test_istio_relation(self, harness: Harness, mocker):
+        """Test Istio relation addition."""
+        harness.set_leader(True)
+        test_model_name = "test-kubeflow"
+        test_gateway = "test-gateway"
+        harness.set_model_name(test_model_name)
+
+        rel_id = harness.add_relation("gateway-info", "istio-pilot")
+        harness.update_relation_data(
+            rel_id,
+            "istio-pilot",
+            {"gateway_namespace": test_model_name, "gateway_name": test_gateway},
+        )
+        harness.add_relation_unit(rel_id, "istio-pilot/0")
+        harness.begin_with_initial_hooks()
+
+        istio_gateway = harness.charm._get_istio_gateway()
+        assert istio_gateway is not None
+        assert istio_gateway == test_model_name + "/" + test_gateway
