@@ -1,0 +1,46 @@
+groups:
+- name: seldon-errors
+  rules:
+  - alert: SeldonWorkqueueTooManyRetries
+    expr: workqueue_retries_total[10m]) > 0
+    for: 0m
+    annotations:
+      severity: critical
+      summary: Seldon workqueue retries increasing for {{ $labels.juju_model }}/{{ $labels.juju_unit }}
+      description: >
+        The number of retries in the Seldon workqueue is increasing for {{ $labels.juju_model }} {{ $labels.juju_unit }}
+        LABELS = {{ $labels }}
+  - alert: SeldonHTTPError
+    expr: rate(rest_client_requests_total{code=~"4.*"}[10m]) > 0
+    for: 0m
+    annotations:
+      severity: critical
+      summary: Seldon HTTP error in {{ $labels.juju_model }}/{{ $labels.juju_unit }}
+      description: >
+        The seldon unit {{ $labels.juju_model }} {{ $labels.juju_unit }} returned an HTTP 4xx code
+        LABELS = {{ $labels }}
+  - alert: SeldonReconcileError
+    expr: rate(controller_runtime_reconcile_total{result="error"}[10m]) > 0
+    for: 0m
+    annotations:
+      severity: critical
+      summary: Seldon reconciliation {{ $labels.juju_model }}/{{ $labels.juju_unit }} failed
+      description: >
+        A seldon reconciliation failed for {{ $labels.juju_model }} {{ $labels.juju_unit }}
+        LABELS = {{ $labels }}
+  - alert: SeldonUnfinishedWorkIncrease
+    expr: rate(workqueue_unfinished_work_seconds[10m]) > 0
+    for: 0m
+    annotations:
+      severity: critical
+      summary: Seldon unfinished work for {{ $labels.juju_model }}/{{ $labels.juju_unit }} is increasing
+      description: >
+      The amount of unfinished work in the workqueue for Seldon {{ $labels.juju_model }}/{{ $labels.juju_unit }} is increasing
+  - alert: SeldonWebhookError
+    expr: rate(controller_runtime_webhook_requests_total{code="5.*"}[10m]) > 0
+    for: 0m
+    annotations:
+      severity: critical
+      summary: Seldon webhook failed for {{ $labels.juju_model }}/{{ $labels.juju_unit }}
+      description: >
+      The webhook {{ $labels.webhook }} failed for {{ $labels.juju_model }}/{{ $labels.juju_unit }}
