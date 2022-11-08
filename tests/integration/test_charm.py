@@ -66,7 +66,10 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     await ops_test.model.add_relation(istio_pilot, istio_gateway)
 
     await ops_test.model.wait_for_idle(
-        apps=[istio_pilot, istio_gateway], status="active", raise_on_blocked=True, timeout=60 * 10
+        apps=[istio_pilot, istio_gateway],
+        status="active",
+        raise_on_blocked=True,
+        timeout=60 * 10 * 2,
     )
 
     # add Seldon/Istio relation
