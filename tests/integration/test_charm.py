@@ -47,6 +47,7 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     """Test Seldon/Istio relation."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
 
+    # setup Istio
     istio_gateway = "istio-ingressgateway"
     istio_pilot = "istio-pilot"
     await ops_test.model.deploy(
@@ -67,6 +68,8 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[istio_pilot, istio_gateway], status="active", raise_on_blocked=True, timeout=60 * 10
     )
+
+    # add Seldon/Istio relation
     await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10

@@ -53,7 +53,6 @@ class SeldonCoreOperator(CharmBase):
         # retrieve configuration and base settings
         self.logger = logging.getLogger(__name__)
         self._gateway = GatewayRequirer(self)
-        self._gateway_info = {}
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
@@ -411,22 +410,16 @@ class SeldonCoreOperator(CharmBase):
 
         return ret_certs
 
-    def _process_gateway_info(self):
-        """Parse gateway information and store it, if it is not empty."""
+    def _get_istio_gateway(self):
+        """Parse 'gateway' relation and return Istio gateway definition in appropriate format."""
         try:
             gateway_info = self._gateway.get_relation_data()
         except GatewayRelationError:
             self.model.unit.status = WaitingStatus("Waiting for gateway info relation")
-            return
+            return None
+        istio_gateway = None
         if gateway_info["gateway_namespace"] and gateway_info["gateway_name"]:
-            self._gateway_info["namespace"] = gateway_info["gateway_namespace"]
-            self._gateway_info["name"] = gateway_info["gateway_name"]
-
-    def _get_istio_gateway(self):
-        """Parse 'gateway_info' and return Istio gateway definition in appropriate format."""
-        istio_gateway = ""
-        if self._gateway_info and self._gateway_info["namespace"] and self._gateway_info["name"]:
-            istio_gateway = self._gateway_info["namespace"] + "/" + self._gateway_info["name"]
+            istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
 
     def main(self, _) -> None:
@@ -434,7 +427,6 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_container_connection()
             self._check_leader()
-            self._process_gateway_info()
             self._deploy_k8s_resources()
             self._update_layer()
         except ErrorWithStatus as error:
