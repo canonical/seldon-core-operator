@@ -13,12 +13,13 @@ resources:
     auto-fetch: true
     upstream-source: 'docker.io/seldonio/seldon-core-operator:1.14.0'
 requires:
-  istio:
-    interface: service-mesh
   ambassador:
     interface: service-mesh
   keda:
     interface: autoscaling
+  gateway-info:
+    interface: istio-gateway-info
+    limit: 1
 provides:
   metrics-endpoint:
     interface: prometheus_scrape

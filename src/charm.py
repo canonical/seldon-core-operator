@@ -15,6 +15,7 @@ from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.istio_pilot.v0.istio_gateway_info import GatewayRelationError, GatewayRequirer
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
@@ -51,6 +52,7 @@ class SeldonCoreOperator(CharmBase):
 
         # retrieve configuration and base settings
         self.logger = logging.getLogger(__name__)
+        self._gateway = GatewayRequirer(self)
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
@@ -173,6 +175,11 @@ class SeldonCoreOperator(CharmBase):
     def _get_env_vars(self):
         """Return environment variables based on model configuration."""
         config = self.model.config
+
+        istio_gateway = self._get_istio_gateway()
+        if istio_gateway is None:
+            istio_gateway = ""
+
         ret_env_vars = {
             "AMBASSADOR_ENABLED": str(bool(self.model.relations["ambassador"])).lower(),
             "AMBASSADOR_SINGLE_NAMESPACE": str(config["ambassador-single-namespace"]).lower(),
@@ -194,8 +201,8 @@ class SeldonCoreOperator(CharmBase):
             ],
             "EXECUTOR_SERVER_METRICS_PORT_NAME": config["executor-server-metrics-port-name"],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
-            "ISTIO_ENABLED": str(bool(self.model.relations["istio"])).lower(),
-            "ISTIO_GATEWAY": config["istio-gateway"],
+            "ISTIO_ENABLED": str(bool(self.model.relations["gateway-info"])).lower(),
+            "ISTIO_GATEWAY": istio_gateway,
             "ISTIO_TLS_MODE": config["istio-tls-mode"],
             "KEDA_ENABLED": str(bool(self.model.relations["keda"])).lower(),
             "MANAGER_CREATE_RESOURCES": "true",
@@ -406,6 +413,18 @@ class SeldonCoreOperator(CharmBase):
             check_call(["rm", "-f", tmp_dir + "/seldon-cert-gen-*"])
 
         return ret_certs
+
+    def _get_istio_gateway(self):
+        """Parse 'gateway' relation and return Istio gateway definition in appropriate format."""
+        try:
+            gateway_info = self._gateway.get_relation_data()
+        except GatewayRelationError:
+            self.model.unit.status = WaitingStatus("Waiting for gateway info relation")
+            return None
+        istio_gateway = None
+        if gateway_info["gateway_namespace"] and gateway_info["gateway_name"]:
+            istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
+        return istio_gateway
 
     def main(self, _) -> None:
         """Perform all required actions the Charm."""
