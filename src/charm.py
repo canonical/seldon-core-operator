@@ -176,6 +176,10 @@ class SeldonCoreOperator(CharmBase):
         """Return environment variables based on model configuration."""
         config = self.model.config
 
+        istio_gateway = self._get_istio_gateway()
+        if istio_gateway is None:
+            istio_gateway = ""
+
         ret_env_vars = {
             "AMBASSADOR_ENABLED": str(bool(self.model.relations["ambassador"])).lower(),
             "AMBASSADOR_SINGLE_NAMESPACE": str(config["ambassador-single-namespace"]).lower(),
@@ -198,7 +202,7 @@ class SeldonCoreOperator(CharmBase):
             "EXECUTOR_SERVER_METRICS_PORT_NAME": config["executor-server-metrics-port-name"],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
             "ISTIO_ENABLED": str(bool(self.model.relations["gateway-info"])).lower(),
-            "ISTIO_GATEWAY": self._get_istio_gateway(),
+            "ISTIO_GATEWAY": istio_gateway,
             "ISTIO_TLS_MODE": config["istio-tls-mode"],
             "KEDA_ENABLED": str(bool(self.model.relations["keda"])).lower(),
             "MANAGER_CREATE_RESOURCES": "true",
