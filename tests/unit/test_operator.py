@@ -66,7 +66,6 @@ class TestCharm:
         """Test Prometheus data setting."""
         harness.set_leader(True)
         harness.set_model_name("test_kubeflow")
-        harness.begin()
 
         mock_net_get = mocker.patch("ops.testing._TestingModelBackend.network_get")
         mocker.patch("ops.testing._TestingPebbleClient.list_files")
@@ -84,6 +83,8 @@ class TestCharm:
         rel_id = harness.add_relation("metrics-endpoint", "otherapp")
         harness.add_relation_unit(rel_id, "otherapp/0")
         harness.update_relation_data(rel_id, "otherapp", {})
+        harness.begin()
+
         assert json.loads(
             harness.get_relation_data(rel_id, harness.model.app.name)["scrape_jobs"]
         )[0]["static_configs"][0]["targets"] == ["*:8080"]
@@ -148,3 +149,34 @@ class TestCharm:
         assert len(cert_info) == 3
         for cert in cert_info.items():
             assert len(str(cert[1])) != 0
+
+    @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
+    @patch("charm.SeldonCoreOperator.k8s_resource_handler")
+    @patch("charm.SeldonCoreOperator.configmap_resource_handler")
+    @patch("charm.SeldonCoreOperator.crd_resource_handler")
+    def test_istio_relation(
+        self,
+        _: MagicMock,  # k8s_resource_handler
+        __: MagicMock,  # configmap_resource_handler
+        ___: MagicMock,  # crd_resource_handler
+        harness: Harness,
+        mocker,
+    ):
+        """Test Istio relation addition."""
+        harness.set_leader(True)
+        test_model_name = "test-kubeflow"
+        test_gateway = "test-gateway"
+        harness.set_model_name(test_model_name)
+
+        rel_id = harness.add_relation("gateway-info", "istio-pilot")
+        harness.update_relation_data(
+            rel_id,
+            "istio-pilot",
+            {"gateway_namespace": test_model_name, "gateway_name": test_gateway},
+        )
+        harness.add_relation_unit(rel_id, "istio-pilot/0")
+        harness.begin_with_initial_hooks()
+
+        istio_gateway = harness.charm._get_istio_gateway()
+        assert istio_gateway is not None
+        assert istio_gateway == test_model_name + "/" + test_gateway

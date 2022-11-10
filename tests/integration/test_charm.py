@@ -43,6 +43,42 @@ async def test_build_and_deploy(ops_test: OpsTest):
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
 
+async def test_seldon_istio_relation(ops_test: OpsTest):
+    """Test Seldon/Istio relation."""
+    # NOTE: This test is re-using deployment created in test_build_and_deploy()
+
+    # setup Istio
+    istio_gateway = "istio-ingressgateway"
+    istio_pilot = "istio-pilot"
+    await ops_test.model.deploy(
+        entity_url="istio-gateway",
+        application_name=istio_gateway,
+        channel="latest/edge",
+        config={"kind": "ingress"},
+        trust=True,
+    )
+    await ops_test.model.deploy(
+        istio_pilot,
+        channel="latest/edge",
+        config={"default-gateway": "test-gateway"},
+        trust=True,
+    )
+    await ops_test.model.add_relation(istio_pilot, istio_gateway)
+
+    await ops_test.model.wait_for_idle(
+        apps=[istio_pilot, istio_gateway],
+        status="active",
+        raise_on_blocked=True,
+        timeout=60 * 10 * 2,
+    )
+
+    # add Seldon/Istio relation
+    await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10
+    )
+
+
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
     stop=tenacity.stop_after_attempt(30),
@@ -50,6 +86,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
 )
 def assert_available(client, seldon_deployment, namespace):
     """Test for available status. Retries multiple times to allow deployment to be created."""
+    # NOTE: This test is re-using deployment created in test_build_and_deploy()
+
     dep = client.get(seldon_deployment, "seldon-model", namespace=namespace)
     state = dep.get("status", {}).get("state")
 
