@@ -39,7 +39,7 @@ groups:
     annotations:
       summary: Seldon unfinished work for {{ $labels.juju_model }}/{{ $labels.juju_unit }} is increasing
       description: >
-      The amount of unfinished work in the workqueue for Seldon {{ $labels.juju_model }}/{{ $labels.juju_unit }} is increasing
+        The amount of unfinished work in the workqueue for Seldon {{ $labels.juju_model }}/{{ $labels.juju_unit }} is increasing
   - alert: SeldonWebhookError
     expr: rate(controller_runtime_webhook_requests_total{code="5.*"}[10m]) > 0
     for: 0m
@@ -48,4 +48,4 @@ groups:
     annotations:
       summary: Seldon webhook failed for {{ $labels.juju_model }}/{{ $labels.juju_unit }}
       description: >
-      The webhook {{ $labels.webhook }} failed for {{ $labels.juju_model }}/{{ $labels.juju_unit }}
+        The webhook {{ $labels.webhook }} failed for {{ $labels.juju_model }}/{{ $labels.juju_unit }}

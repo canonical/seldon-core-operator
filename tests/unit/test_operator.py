@@ -85,9 +85,28 @@ class TestCharm:
         harness.update_relation_data(rel_id, "otherapp", {})
         harness.begin()
 
+        # basic data
         assert json.loads(
             harness.get_relation_data(rel_id, harness.model.app.name)["scrape_jobs"]
         )[0]["static_configs"][0]["targets"] == ["*:8080"]
+
+        # alert rules
+        alert_rules = json.loads(
+            harness.get_relation_data(rel_id, harness.model.app.name)["alert_rules"]
+        )
+        assert alert_rules is not None
+        assert alert_rules["groups"] is not None and alert_rules["groups"][0] is not None
+        rules = alert_rules["groups"][0]["rules"]
+        alerts = [
+            "SeldonWorkqueueTooManyRetries",
+            "SeldonHTTPError",
+            "SeldonReconcileError",
+            "SeldonUnfinishedWorkIncrease",
+            "SeldonWebhookError",
+        ]
+        assert rules is not None and len(rules) == len(alerts)
+        for rule in rules:
+            assert rule["alert"] in alerts
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
