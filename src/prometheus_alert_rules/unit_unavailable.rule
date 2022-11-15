@@ -1,8 +1,9 @@
 alert: SeldonUnitIsUnavailable
 expr: up < 1
 for: 0m
-annotations:
+labels:
   severity: critical
+annotations:
   summary: Seldon unit {{ $labels.juju_model }}/{{ $labels.juju_unit }} unavailable
   description: >
     The seldon unit {{ $labels.juju_model }} {{ $labels.juju_unit }} is unavailable
