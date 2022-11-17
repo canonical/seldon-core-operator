@@ -102,6 +102,15 @@ def assert_available(client, seldon_deployment, deploy_name, namespace):
     assert state == "Available", f"Waited too long for seldondeployment/{deploy_name}!"
 
 
+async def fetch_url(url):
+    """Fetch provided URL and return JSON."""
+    result = None
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            result = await response.json()
+    return result
+
+
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
@@ -121,11 +130,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     prometheus_url = prometheus_units["prometheus-k8s/0"]["address"]
 
     # obtain scrape targets from Prometheus
-    targets_result = None
-    targets_url = f"http://{prometheus_url}:9090/api/v1/targets"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(targets_url) as response:
-            targets_result = await response.json()
+    targets_result = await fetch_url(f"http://{prometheus_url}:9090/api/v1/targets")
 
     # verify that Seldon is in the target list
     assert targets_result is not None
@@ -134,11 +139,8 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     assert discovered_labels["juju_application"] == "seldon-controller-manager"
 
     # obtain alert rules from Prometheus
-    alert_rules_result = None
     rules_url = f"http://{prometheus_url}:9090/api/v1/rules"
-    async with aiohttp.ClientSession() as session:
-        async with session.get(rules_url) as response:
-            alert_rules_result = await response.json()
+    alert_rules_result = await fetch_url(rules_url)
 
     # verify that all Seldon alert rules are in the list
     assert alert_rules_result is not None
@@ -152,6 +154,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # verify that alert SeldonReconcileError is inactive
     assert rules[2]["name"] == "SeldonReconcileError" and rules[2]["state"] == "inactive"
+
+    # The following integration tests is experimental and might not be functioning correctly under
+    # some conditions due to its reliance on timing of K8S deployments, timing of Prometheus
+    # scraping, and rate calculations for alerts.
+    # In addition, Seldon Core Operator has one easily triggered alert that can be simulated.
 
     # simulate scenario where alert will fire
     # create SeldonDeployment
@@ -172,18 +179,27 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     client.delete(Deployment, name="seldon-model-1-example-0-classifier", namespace=namespace)
 
     # Prometheus scraping is done once a minute
-    # wait for 90 seconds to ensure alert state is propagated
-    logger.info("Waiting for alert state to propagate to Prometheus.")
-    sleep(90)
+    # wait for 2 minutes to ensure alert state is propagated
+    for min_idx in range(2):
+        logger.info("Waiting for alert state to propagate to Prometheus.")
+        # obtain updated alert rules from Prometheus
+        alert_rules_result = await fetch_url(rules_url)
+
+        # verify that alert SeldonReconcileError is firing
+        rules = alert_rules_result["data"]["groups"][0]["rules"]
+        if rules[2]["state"] == "firing":
+            break
+        sleep(60)
 
     # obtain updated alert rules from Prometheus
-    async with aiohttp.ClientSession() as session:
-        async with session.get(rules_url) as response:
-            alert_rules_result = await response.json()
+    alert_rules_result = await fetch_url(rules_url)
 
     # verify that alert SeldonReconcileError is firing
     rules = alert_rules_result["data"]["groups"][0]["rules"]
     assert rules[2]["name"] == "SeldonReconcileError" and rules[2]["state"] == "firing"
+
+    # cleanup SeldonDeployment
+    client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace)
 
 
 async def test_seldon_deployment(ops_test: OpsTest):
