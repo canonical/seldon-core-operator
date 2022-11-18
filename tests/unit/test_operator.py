@@ -8,6 +8,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Harness
 
@@ -85,9 +86,33 @@ class TestCharm:
         harness.update_relation_data(rel_id, "otherapp", {})
         harness.begin()
 
+        # basic data
         assert json.loads(
             harness.get_relation_data(rel_id, harness.model.app.name)["scrape_jobs"]
         )[0]["static_configs"][0]["targets"] == ["*:8080"]
+
+        # alert rules
+        alert_rules = json.loads(
+            harness.get_relation_data(rel_id, harness.model.app.name)["alert_rules"]
+        )
+        assert alert_rules is not None
+        assert alert_rules["groups"] is not None and alert_rules["groups"][0] is not None
+        rules = alert_rules["groups"][0]["rules"]
+
+        # load alert rules from rules file
+        alerts = []
+        with open("src/prometheus_alert_rules/seldon_errors.rule") as f:
+            seldon_errors = yaml.safe_load(f.read())
+            alerts_list = seldon_errors["groups"][0]["rules"]
+            for alert in alerts_list:
+                alerts.append(alert["alert"])
+
+        # verify number of alerts is the same in relation and in the rules file
+        assert len(rules) == len(alerts)
+
+        # verify alerts in relation match alerts in the rules file
+        for rule in rules:
+            assert rule["alert"] in alerts
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")

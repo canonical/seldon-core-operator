@@ -7,12 +7,14 @@
 import logging
 from pathlib import Path
 
+import aiohttp
 import pytest
 import requests
 import tenacity
 import yaml
 from lightkube import Client
 from lightkube.generic_resource import create_namespaced_resource
+from lightkube.resources.apps_v1 import Deployment
 from lightkube.resources.core_v1 import Namespace, Service
 from pytest_operator.plugin import OpsTest
 
@@ -84,23 +86,158 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     stop=tenacity.stop_after_attempt(30),
     reraise=True,
 )
-def assert_available(client, seldon_deployment, namespace):
+def assert_available(client, resource_class, resource_name, namespace):
     """Test for available status. Retries multiple times to allow deployment to be created."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
 
-    dep = client.get(seldon_deployment, "seldon-model", namespace=namespace)
+    dep = client.get(resource_class, resource_name, namespace=namespace)
     state = dep.get("status", {}).get("state")
 
+    resource_class_kind = resource_class.__name__
     if state == "Available":
-        logger.info(f"SeldonDeployment status == {state}")
+        logger.info(f"{resource_class_kind}/{resource_name} status == {state}")
     else:
-        logger.info(f"SeldonDeployment status == {state} (waiting for 'Available')")
+        logger.info(
+            f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
+        )
 
-    assert state == "Available", "Waited too long for seldondeployment/seldon-model!"
+    assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
+
+
+async def fetch_url(url):
+    """Fetch provided URL and return JSON."""
+    result = None
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            result = await response.json()
+    return result
+
+
+@tenacity.retry(wait=tenacity.wait_fixed(30), stop=tenacity.stop_after_attempt(6), reraise=True)
+async def check_alert_propagation(url, alert_name):
+    """
+    Check if given alert's state is propagated to Prometheus.
+
+    Prometheus scraping is done once a minute. Retry for 3 minutes to ensure alert state is
+    propagated. Assert if given alert is not in firing state.
+    """
+    alert_rules_result = await fetch_url(url)
+    logger.info("Waiting for alert state to propagate to Prometheus")
+
+    # verify that given alert is firing
+    alert_rules = alert_rules_result["data"]["groups"][0]["rules"]
+    alert_rule = next((rule for rule in alert_rules if rule["name"] == alert_name))
+    assert alert_rule is not None and alert_rule["state"] == "firing"
+
+
+async def test_seldon_alert_rules(ops_test: OpsTest):
+    """Test Seldon alert rules."""
+    # NOTE: This test is re-using deployments created in test_build_and_deploy()
+    namespace = ops_test.model.name
+    client = Client()
+
+    # setup Prometheus
+    prometheus = "prometheus-k8s"
+    await ops_test.model.deploy(prometheus, channel="latest/stable", trust=True)
+    await ops_test.model.relate(prometheus, APP_NAME)
+    await ops_test.model.wait_for_idle(
+        apps=[prometheus], status="active", raise_on_blocked=True, timeout=60 * 10
+    )
+
+    status = await ops_test.model.get_status()
+    prometheus_units = status["applications"]["prometheus-k8s"]["units"]
+    prometheus_url = prometheus_units["prometheus-k8s/0"]["address"]
+
+    # Test 1: Verify that Prometheus receives the same set of rules as specified.
+
+    # obtain scrape targets from Prometheus
+    targets_result = await fetch_url(f"http://{prometheus_url}:9090/api/v1/targets")
+
+    # verify that Seldon is in the target list
+    assert targets_result is not None
+    assert targets_result["status"] == "success"
+    discovered_labels = targets_result["data"]["activeTargets"][0]["discoveredLabels"]
+    assert discovered_labels["juju_application"] == "seldon-controller-manager"
+
+    # obtain alert rules from Prometheus
+    rules_url = f"http://{prometheus_url}:9090/api/v1/rules"
+    alert_rules_result = await fetch_url(rules_url)
+
+    # verify alerts are available in Prometheus
+    assert alert_rules_result is not None
+    assert alert_rules_result["status"] == "success"
+    rules = alert_rules_result["data"]["groups"][0]["rules"]
+
+    # load alert rules from the rules file
+    rules_file_alert_names = []
+    with open("src/prometheus_alert_rules/seldon_errors.rule") as f:
+        seldon_errors = yaml.safe_load(f.read())
+        alerts_list = seldon_errors["groups"][0]["rules"]
+        for alert in alerts_list:
+            rules_file_alert_names.append(alert["alert"])
+
+    # verify number of alerts is the same in Prometheus and in the rules file
+    assert len(rules) == len(rules_file_alert_names)
+
+    # verify that all Seldon alert rules are in the list and that alerts obtained from Prometheus
+    # match alerts in the rules file
+    for rule in rules:
+        assert rule["name"] in rules_file_alert_names
+
+    # The following integration test is optional (experimental) and might not be functioning
+    # correctly under some conditions due to its reliance on timing of K8S deployments, timing of
+    # Prometheus scraping, and rate calculations for alerts.
+    # In addition, Seldon Core Operator has one relatively easily triggered alert
+    # (SeldonReconcileError) that can be simulated.
+
+    # Test 2: Simulate propagattion of SeldonReconcileError alert by deleting deployment.
+
+    test_alert_name = "SeldonReconcileError"
+
+    # verify that alert SeldonReconcileError is inactive
+    seldon_reconcile_error_alert = next(
+        (rule for rule in rules if rule["name"] == test_alert_name)
+    )
+    assert seldon_reconcile_error_alert["state"] == "inactive"
+
+    # simulate scenario where alert will fire
+    # create SeldonDeployment
+    seldon_deployment = create_namespaced_resource(
+        group="machinelearning.seldon.io",
+        version="v1",
+        kind="seldondeployment",
+        plural="seldondeployments",
+        verbs=None,
+    )
+    with open("examples/serve-simple-v1.yaml") as f:
+        sdep = seldon_deployment(yaml.safe_load(f.read()))
+        sdep["metadata"]["name"] = "seldon-model-1"
+        client.create(sdep, namespace=namespace)
+    assert_available(client, seldon_deployment, "seldon-model-1", namespace)
+
+    # remove deployment that was created by Seldon, reconcile alert will fire
+    client.delete(Deployment, name="seldon-model-1-example-0-classifier", namespace=namespace)
+
+    # check Prometheus for propagated alerts
+    await check_alert_propagation(rules_url, test_alert_name)
+
+    # obtain updated alert rules from Prometheus
+    alert_rules_result = await fetch_url(rules_url)
+
+    # verify that alert SeldonReconcileError is firing
+    rules = alert_rules_result["data"]["groups"][0]["rules"]
+    seldon_reconcile_error_alert = next(
+        (rule for rule in rules if rule["name"] == test_alert_name)
+    )
+    assert seldon_reconcile_error_alert["state"] == "firing"
+
+    # cleanup SeldonDeployment
+    client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace)
 
 
 async def test_seldon_deployment(ops_test: OpsTest):
     """Test Seldon Deployment scenario."""
+    # NOTE: This test is re-using deployment created in test_build_and_deploy()
     namespace = ops_test.model_name
     client = Client()
 
@@ -120,7 +257,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
         sdep = seldon_deployment(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, seldon_deployment, namespace)
+    assert_available(client, seldon_deployment, "seldon-model", namespace)
 
     service_name = "seldon-model-example-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
