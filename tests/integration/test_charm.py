@@ -127,7 +127,6 @@ async def check_alert_propagation(url, alert_name):
     # verify that given alert is firing
     alert_rules = alert_rules_result["data"]["groups"][0]["rules"]
     alert_rule = next((rule for rule in alert_rules if rule["name"] == alert_name))
-    logger.info(f">>> {alert_rule}")
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
 
@@ -139,7 +138,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # setup Prometheus
     prometheus = "prometheus-k8s"
-    await ops_test.model.deploy(prometheus, channel="latest/edge", trust=True)
+    await ops_test.model.deploy(prometheus, channel="latest/stable", trust=True)
     await ops_test.model.relate(prometheus, APP_NAME)
     await ops_test.model.wait_for_idle(
         apps=[prometheus], status="active", raise_on_blocked=True, timeout=60 * 10
