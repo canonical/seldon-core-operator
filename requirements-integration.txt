@@ -26,14 +26,11 @@ backcall==0.2.0
     # via ipython
 bcrypt==4.0.1
     # via paramiko
-cachetools==5.2.0
-    # via google-auth
 certifi==2022.9.24
     # via
     #   -r ./requirements.txt
     #   httpcore
     #   httpx
-    #   kubernetes
     #   requests
 cffi==1.15.1
     # via
@@ -65,8 +62,6 @@ frozenlist==1.3.3
     # via
     #   aiohttp
     #   aiosignal
-google-auth==2.14.1
-    # via kubernetes
 h11==0.14.0
     # via
     #   -r ./requirements.txt
@@ -104,14 +99,12 @@ jsonschema==3.2.0
     # via
     #   -r ./requirements.txt
     #   serialized-data-interface
-juju==3.0.4
+juju==2.8.4
     # via
     #   -r ./requirements-integration.in
     #   pytest-operator
 jujubundlelib==0.5.7
     # via theblues
-kubernetes==17.17.0
-    # via juju
 lightkube==0.11.0
     # via
     #   -r ./requirements.txt
@@ -136,8 +129,6 @@ multidict==6.0.2
     #   yarl
 mypy-extensions==0.4.3
     # via typing-inspect
-oauthlib==3.2.2
-    # via requests-oauthlib
 oci-image==1.0.0
     # via -r ./requirements.txt
 ops==1.5.4
@@ -170,12 +161,7 @@ ptyprocess==0.7.0
 pure-eval==0.2.2
     # via stack-data
 pyasn1==0.4.8
-    # via
-    #   juju
-    #   pyasn1-modules
-    #   rsa
-pyasn1-modules==0.2.8
-    # via google-auth
+    # via juju
 pycparser==2.21
     # via cffi
 pygments==2.13.0
@@ -205,8 +191,6 @@ pytest-asyncio==0.20.2
     # via pytest-operator
 pytest-operator==0.22.0
     # via -r ./requirements-integration.in
-python-dateutil==2.8.2
-    # via kubernetes
 pytz==2022.6
     # via pyrfc3339
 pyyaml==5.4
@@ -214,7 +198,6 @@ pyyaml==5.4
     #   -r ./requirements.txt
     #   juju
     #   jujubundlelib
-    #   kubernetes
     #   lightkube
     #   ops
     #   pytest-operator
@@ -223,19 +206,13 @@ requests==2.25.0
     # via
     #   -r ./requirements-integration.in
     #   -r ./requirements.txt
-    #   kubernetes
     #   macaroonbakery
-    #   requests-oauthlib
     #   serialized-data-interface
     #   theblues
-requests-oauthlib==1.3.1
-    # via kubernetes
 rfc3986[idna2008]==1.5.0
     # via
     #   -r ./requirements.txt
     #   httpx
-rsa==4.9
-    # via google-auth
 ruamel-yaml==0.17.21
     # via
     #   -r ./requirements.txt
@@ -250,13 +227,10 @@ six==1.16.0
     # via
     #   -r ./requirements.txt
     #   asttokens
-    #   google-auth
     #   jsonschema
-    #   kubernetes
     #   macaroonbakery
     #   paramiko
     #   pymacaroons
-    #   python-dateutil
 sniffio==1.3.0
     # via
     #   -r ./requirements.txt
@@ -286,14 +260,13 @@ typing-inspect==0.8.0
 urllib3==1.26.13
     # via
     #   -r ./requirements.txt
-    #   kubernetes
     #   requests
 wcwidth==0.2.5
     # via prompt-toolkit
-websocket-client==1.4.2
-    # via kubernetes
-websockets==8.1
-    # via juju
+websockets==7.0
+    # via
+    #   -r ./requirements-integration.in
+    #   juju
 yarl==1.8.1
     # via aiohttp
 
