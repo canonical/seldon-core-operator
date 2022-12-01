@@ -58,9 +58,6 @@ jobs:
     steps:
     - name: Check out repo
       uses: actions/checkout@v2
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
 
     - name: Setup operator environment
       uses: claudiubelu/actions-operator@18ebf92ae3043bd3dd15238e5d9b662d7ba08daf
@@ -70,6 +67,10 @@ jobs:
         # Pinned until this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833
         bootstrap-options: "--agent-version=2.9.34"
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
+    
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
     - name: Run integration tests
       run: tox -vve integration -- --model testing
