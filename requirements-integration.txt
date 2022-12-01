@@ -39,7 +39,7 @@ chardet==3.0.4
     # via requests
 charmed-kubeflow-chisme==0.0.5
     # via -r ./requirements-integration.in
-charset-normalizer==2.1.1
+charset-normalizer==2.0.12
     # via aiohttp
 cryptography==38.0.4
     # via paramiko
@@ -79,7 +79,7 @@ ipython==8.7.0
     # via ipdb
 jedi==0.18.2
     # via ipython
-jinja2==3.1.2
+jinja2==3.0.3
     # via
     #   -r ./requirements-integration.in
     #   charmed-kubeflow-chisme
@@ -175,6 +175,7 @@ pyrsistent==0.19.2
     # via jsonschema
 pytest==7.2.0
     # via
+    #   -r ./requirements-integration.in
     #   pytest-asyncio
     #   pytest-operator
 pytest-asyncio==0.20.2
@@ -212,7 +213,7 @@ ruamel-yaml==0.17.21
     # via charmed-kubeflow-chisme
 ruamel-yaml-clib==0.2.7
     # via ruamel-yaml
-serialized-data-interface==0.4.0
+serialized-data-interface==0.3.5
     # via -r ./requirements-integration.in
 six==1.16.0
     # via

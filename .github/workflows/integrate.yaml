@@ -72,6 +72,13 @@ jobs:
       run: tox -vve integration -- --model testing
 
     # On failure, capture debugging resources
+    - name: Setup tmate session
+      if: failure()
+      uses: mxschmitt/action-tmate@v3
+      timeout-minutes: 60
+      with:
+        limit-access-to-actor: true
+
     - name: Get all
       run: kubectl get all -A
       if: failure()
