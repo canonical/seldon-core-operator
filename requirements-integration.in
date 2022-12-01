@@ -1,7 +1,13 @@
 aiohttp
 jinja2
-juju==3.0.4
+juju
 pytest-operator
 requests
-websockets<9.0,>=8.0
--r requirements.txt
+websockets
+charmed-kubeflow-chisme
+lightkube
+lightkube-models
+ops
+oci-image
+serialized-data-interface
+tenacity
