@@ -1,7 +1,7 @@
 aiohttp
 jinja2
-juju
+juju==3.0.4
 pytest-operator
 requests
-websockets<8.0
+websockets<9.0,>=8.0
 -r requirements.txt

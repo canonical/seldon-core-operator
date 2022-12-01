@@ -2,6 +2,6 @@ charmed-kubeflow-chisme
 lightkube
 lightkube-models
 ops
-oci-image==1.0.0
-serialized-data-interface<0.4
+oci-image
+serialized-data-interface
 tenacity
