@@ -74,7 +74,7 @@ jobs:
 
     - name: remove bad tox and install correct one
       run: |
-        /usr/bin/pip uninstall -y tox
+        sudo /usr/bin/pip uninstall -y tox
         /opt/hostedtoolcache/Python/3.10.5/x64/bin/pip install tox
 
     - name: Run integration tests
