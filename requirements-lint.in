@@ -1,4 +1,3 @@
-black
 codespell
 flake8<6
 flake8-builtins
@@ -8,4 +7,4 @@ flake8-copyright
 flake8-docstrings
 pep8-naming
 pyproject-flake8
-isort
+-r requirements-fmt.txt
