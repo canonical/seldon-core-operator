@@ -17,6 +17,7 @@ from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.observability_libs.v0.metrics_endpoint_discovery import MetricsEndpointObserver
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
@@ -63,7 +64,7 @@ class SeldonCoreOperator(CharmBase):
         self._container = self.unit.get_container(self._container_name)
 
         # generate certs
-        self._stored.set_default(**self._gen_certs())
+        self._stored.set_default(**self._gen_certs(), targets={})
 
         # setup context to be used for updating K8S resources
         self._context = {
@@ -106,12 +107,21 @@ class SeldonCoreOperator(CharmBase):
                     "static_configs": [{"targets": ["*:{}".format(self.config["metrics-port"])]}],
                 }
             ],
+            lookaside_jobs_callable=self.return_list_of_running_models,
         )
 
         # Dashboard related config (Grafana)
         self.dashboard_provider = GrafanaDashboardProvider(
             charm=self,
             relation_name="grafana-dashboard",
+        )
+
+        self.metrics_server_observer = MetricsEndpointObserver(
+            self, {"seldon-deployment-id": None}
+        )
+        self.framework.observe(
+            self.metrics_server_observer.on.metrics_endpoint_change,
+            self.on_metrics_endpoint_change,
         )
 
     @property
@@ -407,6 +417,10 @@ class SeldonCoreOperator(CharmBase):
 
         return ret_certs
 
+    def on_metrics_endpoint_change(self, event):
+        self._stored.targets["ports"].append(event.discovered["targets"])
+        self.prometheus_provider.set_scrape_job_spec()
+
     def main(self, _) -> None:
         """Perform all required actions the Charm."""
         try:
@@ -419,6 +433,9 @@ class SeldonCoreOperator(CharmBase):
             return
 
         self.model.unit.status = ActiveStatus()
+
+    def return_list_of_running_models(self):
+        return [{"running-models": [{"targets": [p for p in self._stored.targets["ports"]]}]}]
 
 
 #
