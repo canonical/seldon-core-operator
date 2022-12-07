@@ -3,7 +3,7 @@
     "rebaseWhen": "behind-base-branch",
     "dependencyDashboard": false,
     "constraints": {
-        "python": "3.8"
+        "python": "3.8.0"
     },
     "pip-compile": {
         "fileMatch": [
