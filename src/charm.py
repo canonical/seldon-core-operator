@@ -16,6 +16,10 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.istio_pilot.v0.istio_gateway_info import GatewayRelationError, GatewayRequirer
+from charms.observability_libs.v0.metrics_endpoint_discovery import (
+    MetricsEndpointChangeCharmEvents,
+    MetricsEndpointObserver,
+)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
@@ -46,6 +50,9 @@ class SeldonCoreOperator(CharmBase):
 
     _stored = StoredState()
 
+    # using CharmEvents extension to handle metrics endpoint changes
+    on = MetricsEndpointChangeCharmEvents()
+
     def __init__(self, *args):
         """Initialize charm and setup the container."""
         super().__init__(*args)
@@ -65,7 +72,7 @@ class SeldonCoreOperator(CharmBase):
         self._container = self.unit.get_container(self._container_name)
 
         # generate certs
-        self._stored.set_default(**self._gen_certs())
+        self._stored.set_default(**self._gen_certs(), targets={})
 
         # setup context to be used for updating K8S resources
         self._context = {
@@ -87,17 +94,6 @@ class SeldonCoreOperator(CharmBase):
             service_name=f"{self.model.app.name}",
         )
 
-        # setup events
-        self.framework.observe(self.on.upgrade_charm, self.main)
-        self.framework.observe(self.on.config_changed, self.main)
-        self.framework.observe(self.on.leader_elected, self.main)
-        self.framework.observe(self.on.seldon_core_pebble_ready, self.main)
-
-        for rel in self.model.relations.keys():
-            self.framework.observe(self.on[rel].relation_changed, self.main)
-        self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.remove, self._on_remove)
-
         # Prometheus related config
         self.prometheus_provider = MetricsEndpointProvider(
             charm=self,
@@ -108,6 +104,11 @@ class SeldonCoreOperator(CharmBase):
                     "static_configs": [{"targets": ["*:{}".format(self.config["metrics-port"])]}],
                 }
             ],
+            lookaside_jobs_callable=self._return_list_of_running_models,
+        )
+        # metrics endpoint observer setup
+        self.metrics_server_observer = MetricsEndpointObserver(
+            self, {"seldon-deployment-id": None}
         )
 
         # Dashboard related config (Grafana)
@@ -115,6 +116,18 @@ class SeldonCoreOperator(CharmBase):
             charm=self,
             relation_name="grafana-dashboard",
         )
+
+        # setup events
+        self.framework.observe(self.on.upgrade_charm, self.main)
+        self.framework.observe(self.on.config_changed, self.main)
+        self.framework.observe(self.on.leader_elected, self.main)
+        self.framework.observe(self.on.seldon_core_pebble_ready, self.main)
+
+        for rel in self.model.relations.keys():
+            self.framework.observe(self.on[rel].relation_changed, self.main)
+        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.metrics_endpoint_change, self._on_metrics_endpoint_change)
 
     @property
     def container(self):
@@ -425,6 +438,20 @@ class SeldonCoreOperator(CharmBase):
         if gateway_info["gateway_namespace"] and gateway_info["gateway_name"]:
             istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
+
+    def _on_metrics_endpoint_change(self, event):
+        """Populate ports of discovered targets."""
+        self._stored.targets["ports"].append(event.discovered["targets"])
+        self.prometheus_provider.set_scrape_job_spec()
+
+    def _return_list_of_running_models(self):
+        """Return running models based on stored targets."""
+        models_list = []
+        if self._stored.targets is not None and len(self._stored.targets) != 0:
+            models_list = [
+                {"running-models": [{"targets": [p for p in self._stored.targets["ports"]]}]}
+            ]
+        return models_list
 
     def main(self, _) -> None:
         """Perform all required actions the Charm."""

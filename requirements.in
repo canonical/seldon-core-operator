@@ -5,3 +5,4 @@ ops
 oci-image
 serialized-data-interface
 tenacity
+websockets
