@@ -13,7 +13,7 @@ attrs==22.1.0
     #   -r ./requirements.txt
     #   jsonschema
     #   pytest
-certifi==2022.9.24
+certifi==2022.12.7
     # via
     #   -r ./requirements.txt
     #   httpcore
@@ -84,12 +84,10 @@ ordered-set==4.1.0
     # via
     #   -r ./requirements.txt
     #   deepdiff
-packaging==21.3
+packaging==22.0
     # via pytest
 pluggy==1.0.0
     # via pytest
-pyparsing==3.0.9
-    # via packaging
 pyrsistent==0.19.2
     # via
     #   -r ./requirements.txt

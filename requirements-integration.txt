@@ -28,7 +28,7 @@ bcrypt==4.0.1
     # via paramiko
 cachetools==5.2.0
     # via google-auth
-certifi==2022.9.24
+certifi==2022.12.7
     # via
     #   -r ./requirements.txt
     #   httpcore
@@ -149,7 +149,7 @@ ordered-set==4.1.0
     # via
     #   -r ./requirements.txt
     #   deepdiff
-packaging==21.3
+packaging==22.0
     # via pytest
 paramiko==2.12.0
     # via juju
@@ -161,7 +161,7 @@ pickleshare==0.7.5
     # via ipython
 pluggy==1.0.0
     # via pytest
-prompt-toolkit==3.0.33
+prompt-toolkit==3.0.36
     # via ipython
 protobuf==3.20.3
     # via macaroonbakery
@@ -187,8 +187,6 @@ pynacl==1.5.0
     #   macaroonbakery
     #   paramiko
     #   pymacaroons
-pyparsing==3.0.9
-    # via packaging
 pyrfc3339==1.1
     # via
     #   juju
