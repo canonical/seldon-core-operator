@@ -110,7 +110,7 @@ juju==3.0.4
     #   pytest-operator
 jujubundlelib==0.5.7
     # via theblues
-kubernetes==17.17.0
+kubernetes==25.3.0
     # via juju
 lightkube==0.11.0
     # via
