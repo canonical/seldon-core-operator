@@ -443,6 +443,10 @@ class SeldonCoreOperator(CharmBase):
         """Populate ports of discovered targets."""
         self._stored.targets["ports"].append(event.discovered["targets"])
         self.prometheus_provider.set_scrape_job_spec()
+        self.logger.info("Metrics endpoint change")
+
+        # proceed with other actions
+        self.main(_)
 
     def _return_list_of_running_models(self):
         """Return running models based on stored targets."""
@@ -451,11 +455,13 @@ class SeldonCoreOperator(CharmBase):
             models_list = [
                 {"running-models": [{"targets": [p for p in self._stored.targets["ports"]]}]}
             ]
+        self.logger.info("Running models: " + str(len(models_list)))
         return models_list
 
     def main(self, _) -> None:
         """Perform all required actions the Charm."""
         try:
+            self.logger.info("Main----")
             self._check_container_connection()
             self._check_leader()
             self._deploy_k8s_resources()
