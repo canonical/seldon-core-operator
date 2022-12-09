@@ -7,11 +7,19 @@
     },
     "pip-compile": {
         "fileMatch": [
-            "(^|/)requirements.*\\.in$"
+            "requirements.in",
+            "requirements-fmt.in",
+            "requirements-lint.in",
+            "requirements-unit.in",
+            "requirements-integration.in"
         ],
         "lockFileMaintenance": {
+            "enabled": true,
             "schedule": null
         }
+    },
+    "pip_requirements": {
+        "enabled": false
     },
     "automergeType": "branch",
     "packageRules": [
