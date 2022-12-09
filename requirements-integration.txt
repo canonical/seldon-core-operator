@@ -45,7 +45,7 @@ chardet==3.0.4
     #   requests
 charmed-kubeflow-chisme==0.0.5
     # via -r ./requirements.txt
-charset-normalizer==2.1.1
+charset-normalizer==3.0.1
     # via aiohttp
 cryptography==38.0.4
     # via paramiko
