@@ -79,7 +79,7 @@ httpx==0.23.1
     # via
     #   -r ./requirements.txt
     #   lightkube
-idna==2.10
+idna==3.4
     # via
     #   -r ./requirements.txt
     #   anyio
