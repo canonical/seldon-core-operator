@@ -335,7 +335,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             ssl_conf_template = open(SSL_CONFIG_FILE)
             ssl_conf = ssl_conf_template.read()
-        except ApiError as error:
+        except IOError as error:
             self.logger.warning(f"Failed to open SSL config file: {error}")
 
         ssl_conf = ssl_conf.replace("{{ model }}", str(model))
