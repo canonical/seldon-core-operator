@@ -302,8 +302,9 @@ class SeldonCoreOperator(CharmBase):
     def _on_pebble_ready(self, _):
         """Log status of the container."""
         if not self.container.can_connect():
-            self.logger.warning("Container {self._container_name} is not ready.")
-            return
+            raise ErrorWithStatus(
+                    f"Container {self._container_name} failed to start",
+                    BlockedStatus)
 
         # upload certs to container
         self._upload_certs_to_container()
