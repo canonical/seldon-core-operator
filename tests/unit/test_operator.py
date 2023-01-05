@@ -91,28 +91,41 @@ class TestCharm:
             harness.get_relation_data(rel_id, harness.model.app.name)["scrape_jobs"]
         )[0]["static_configs"][0]["targets"] == ["*:8080"]
 
-        # alert rules
-        alert_rules = json.loads(
-            harness.get_relation_data(rel_id, harness.model.app.name)["alert_rules"]
-        )
-        assert alert_rules is not None
-        assert alert_rules["groups"] is not None and alert_rules["groups"][0] is not None
-        rules = alert_rules["groups"][0]["rules"]
-
         # load alert rules from rules file
-        alerts = []
+        test_alerts = []
         with open("src/prometheus_alert_rules/seldon_errors.rule") as f:
             seldon_errors = yaml.safe_load(f.read())
             alerts_list = seldon_errors["groups"][0]["rules"]
             for alert in alerts_list:
-                alerts.append(alert["alert"])
+                test_alerts.append(alert["alert"])
+
+        # alert rules
+        alert_rules = json.loads(
+            harness.get_relation_data(rel_id, harness.model.app.name)["alert_rules"]
+        )
+
+        assert alert_rules is not None
+        assert alert_rules["groups"] is not None
+        # there are two groups of alerts:
+        # - Seldon errors has 5 alerts
+        # - Unit unavailable has 1 alert
+        assert alert_rules["groups"][0] is not None
+        assert alert_rules["groups"][1] is not None
+        rules = []
+        if len(alert_rules["groups"][0]["rules"]) == len(test_alerts):
+            rules = alert_rules["groups"][0]["rules"]
+        elif len(alert_rules["groups"][1]["rules"]) == len(test_alerts):
+            rules = alert_rules["groups"][1]["rules"]
+        else:
+            # Seldon error alerts not found
+            assert 0
 
         # verify number of alerts is the same in relation and in the rules file
-        assert len(rules) == len(alerts)
+        assert len(rules) == len(test_alerts)
 
         # verify alerts in relation match alerts in the rules file
         for rule in rules:
-            assert rule["alert"] in alerts
+            assert rule["alert"] in test_alerts
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
