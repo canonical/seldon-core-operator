@@ -95,7 +95,6 @@ class SeldonCoreOperator(CharmBase):
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self.main)
-        self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.remove, self._on_remove)
 
         # Prometheus related config
@@ -300,23 +299,14 @@ class SeldonCoreOperator(CharmBase):
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _on_install(self, _):
-        """Perform installation only actions."""
-        # upload certs to container
-        self.logger.info("Install")
-        self._check_container_connection()
-        self._upload_certs_to_container()
-
-        # proceed with other actions
-        self.main(_)
-
     def _on_pebble_ready(self, _):
         """Log status of the container."""
-        self.logger.info("Pebble ready.")
         if not self.container.can_connect():
             self.logger.warning("Container {self._container_name} is not ready.")
-        else:
-            self.logger.warning(f"Container {self._container_name} is ready.")
+            return
+
+        # upload certs to container
+        self._upload_certs_to_container()
 
         # proceed with other actions
         self.main(_)
