@@ -68,6 +68,10 @@ jobs:
         bootstrap-options: "--agent-version=2.9.34"
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
+    - name: Setup tmate session
+      uses: mxschmitt/action-tmate@v3
+      timeout-minutes: 60
+
     - name: Run integration tests
       run: tox -vve integration -- --model testing
 
