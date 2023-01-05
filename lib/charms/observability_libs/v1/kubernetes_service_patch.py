@@ -146,7 +146,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 ServiceType = Literal["ClusterIP", "LoadBalancer"]
 
@@ -158,11 +158,11 @@ class KubernetesServicePatch(Object):
         self,
         charm: CharmBase,
         ports: List[ServicePort],
-        service_name: str = None,
+        service_name: Optional[str] = None,
         service_type: ServiceType = "ClusterIP",
-        additional_labels: dict = None,
-        additional_selectors: dict = None,
-        additional_annotations: dict = None,
+        additional_labels: Optional[dict] = None,
+        additional_selectors: Optional[dict] = None,
+        additional_annotations: Optional[dict] = None,
         *,
         refresh_event: Optional[Union[BoundEvent, List[BoundEvent]]] = None,
     ):
@@ -213,11 +213,11 @@ class KubernetesServicePatch(Object):
     def _service_object(
         self,
         ports: List[ServicePort],
-        service_name: str = None,
+        service_name: Optional[str] = None,
         service_type: ServiceType = "ClusterIP",
-        additional_labels: dict = None,
-        additional_selectors: dict = None,
-        additional_annotations: dict = None,
+        additional_labels: Optional[dict] = None,
+        additional_selectors: Optional[dict] = None,
+        additional_annotations: Optional[dict] = None,
     ) -> Service:
         """Creates a valid Service representation.
 
