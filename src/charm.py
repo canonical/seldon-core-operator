@@ -303,8 +303,8 @@ class SeldonCoreOperator(CharmBase):
         """Log status of the container."""
         if not self.container.can_connect():
             raise ErrorWithStatus(
-                    f"Container {self._container_name} failed to start",
-                    BlockedStatus)
+                f"Container {self._container_name} failed to start", BlockedStatus
+            )
 
         # upload certs to container
         self._upload_certs_to_container()
