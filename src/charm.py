@@ -91,7 +91,7 @@ class SeldonCoreOperator(CharmBase):
         self.framework.observe(self.on.upgrade_charm, self.main)
         self.framework.observe(self.on.config_changed, self.main)
         self.framework.observe(self.on.leader_elected, self.main)
-        self.framework.observe(self.on.seldon_core_pebble_ready, self.main)
+        self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self.main)
@@ -303,8 +303,20 @@ class SeldonCoreOperator(CharmBase):
     def _on_install(self, _):
         """Perform installation only actions."""
         # upload certs to container
+        self.logger.info("Install")
         self._check_container_connection()
         self._upload_certs_to_container()
+
+        # proceed with other actions
+        self.main(_)
+
+    def _on_pebble_ready(self, _):
+        """Log status of the container."""
+        self.logger.info("Pebble ready.")
+        if not self.container.can_connect():
+            self.logger.warning("Container {self._container_name} is not ready.")
+        else:
+            self.logger.warning(f"Container {self._container_name} is ready.")
 
         # proceed with other actions
         self.main(_)
