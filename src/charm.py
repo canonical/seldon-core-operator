@@ -303,10 +303,9 @@ class SeldonCoreOperator(CharmBase):
     def _on_install(self, _):
         """Perform installation only actions."""
         if not self.container.can_connect():
-            self.logger.warning(f"Container {self._container_name} is not ready")
             raise ErrorWithStatus(f"Container {self._container_name} is not ready", WaitingStatus)
 
-        # proceed with other the same action as for Pebble Ready event
+        # proceed with the same actions as for Pebble Ready event
         self._on_pebble_ready(_)
 
     def _on_pebble_ready(self, _):
