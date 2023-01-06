@@ -91,7 +91,7 @@ class SeldonCoreOperator(CharmBase):
         self.framework.observe(self.on.upgrade_charm, self.main)
         self.framework.observe(self.on.config_changed, self.main)
         self.framework.observe(self.on.leader_elected, self.main)
-        self.framework.observe(self.on.seldon_core_pebble_ready, self.main)
+        self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self.main)
@@ -302,8 +302,19 @@ class SeldonCoreOperator(CharmBase):
 
     def _on_install(self, _):
         """Perform installation only actions."""
-        # upload certs to container
         self._check_container_connection()
+
+        # proceed with the same actions as for Pebble Ready event
+        self._on_pebble_ready(_)
+
+    def _on_pebble_ready(self, _):
+        """Configure started container."""
+        if not self.container.can_connect():
+            raise ErrorWithStatus(
+                f"Container {self._container_name} failed to start", BlockedStatus
+            )
+
+        # upload certs to container
         self._upload_certs_to_container()
 
         # proceed with other actions
@@ -335,7 +346,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             ssl_conf_template = open(SSL_CONFIG_FILE)
             ssl_conf = ssl_conf_template.read()
-        except ApiError as error:
+        except IOError as error:
             self.logger.warning(f"Failed to open SSL config file: {error}")
 
         ssl_conf = ssl_conf.replace("{{ model }}", str(model))
