@@ -41,6 +41,18 @@ CONFIGMAP_RESOURCE_FILES = [
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 
 
+class CheckFailed(Exception):
+    """Raise this exception if one of the checks in main fails."""
+
+    def __init__(self, msg, status_type=None):
+        """Raise this exception if one of the checks in main fails."""
+        super().__init__()
+
+        self.msg = msg
+        self.status_type = status_type
+        self.status = status_type(msg)
+
+
 class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator."""
 
@@ -95,7 +107,9 @@ class SeldonCoreOperator(CharmBase):
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self.main)
-        self.framework.observe(self.on.install, self._on_install)
+        # on Install event perform the same actions as on Pebble Ready event
+        # NOTE: there is a container connection check in _on_pebble_ready()
+        self.framework.observe(self.on.install, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
 
         # Prometheus related config
@@ -247,10 +261,17 @@ class SeldonCoreOperator(CharmBase):
 
         return Layer(layer_config)
 
-    def _check_container_connection(self):
-        """Check if connection can be made with container."""
+    def _is_container_ready(self):
+        """Check if connection can be made with container.
+
+        Returns: False if container is not available
+                 True if connection can be made
+        Sets maintenance status if container is not available.
+        """
         if not self.container.can_connect():
-            raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
+            self.unit.status = MaintenanceStatus("Waiting for pod startup to complete")
+            return False
+        return True
 
     def _check_leader(self):
         """Check if this unit is a leader."""
@@ -300,19 +321,10 @@ class SeldonCoreOperator(CharmBase):
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _on_install(self, _):
-        """Perform installation only actions."""
-        self._check_container_connection()
-
-        # proceed with the same actions as for Pebble Ready event
-        self._on_pebble_ready(_)
-
     def _on_pebble_ready(self, _):
         """Configure started container."""
-        if not self.container.can_connect():
-            raise ErrorWithStatus(
-                f"Container {self._container_name} failed to start", BlockedStatus
-            )
+        if not self._is_container_ready():
+            return
 
         # upload certs to container
         self._upload_certs_to_container()
@@ -440,10 +452,10 @@ class SeldonCoreOperator(CharmBase):
     def main(self, _) -> None:
         """Perform all required actions the Charm."""
         try:
-            self._check_container_connection()
             self._check_leader()
             self._deploy_k8s_resources()
-            self._update_layer()
+            if self._is_container_ready():
+                self._update_layer()
         except ErrorWithStatus as error:
             self.model.unit.status = error.status
             return
