@@ -41,18 +41,6 @@ CONFIGMAP_RESOURCE_FILES = [
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 
 
-class CheckFailed(Exception):
-    """Raise this exception if one of the checks in main fails."""
-
-    def __init__(self, msg, status_type=None):
-        """Raise this exception if one of the checks in main fails."""
-        super().__init__()
-
-        self.msg = msg
-        self.status_type = status_type
-        self.status = status_type(msg)
-
-
 class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator."""
 
@@ -454,8 +442,9 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_leader()
             self._deploy_k8s_resources()
-            if self._is_container_ready():
-                self._update_layer()
+            if not self._is_container_ready():
+                return
+            self._update_layer()
         except ErrorWithStatus as error:
             self.model.unit.status = error.status
             return
