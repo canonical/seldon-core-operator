@@ -95,9 +95,10 @@ class SeldonCoreOperator(CharmBase):
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self.main)
-        # on Install event perform the same actions as on Pebble Ready event
-        # NOTE: there is a container connection check in _on_pebble_ready()
-        self.framework.observe(self.on.install, self._on_pebble_ready)
+        # on.install event is handled by main.  If this fires before pebble_ready, then we get a
+        # head start on deploying k8s resources.  If it fires after pebble_ready, then it is
+        # redundant but has no ill effect.
+        self.framework.observe(self.on.install, self.main)
         self.framework.observe(self.on.remove, self._on_remove)
 
         # Prometheus related config
@@ -282,6 +283,12 @@ class SeldonCoreOperator(CharmBase):
 
     def _upload_certs_to_container(self):
         """Upload generated certs to container."""
+        if not self._is_container_ready():
+            error_msg = "Failed to upload certs to container - unable to connect to container.  " \
+                        "This may be transient while we wait for the container to come up."
+            self.logger.error(error_msg)
+            raise ErrorWithStatus(error_msg, WaitingStatus)
+
         self.container.push(
             "/tmp/k8s-webhook-server/serving-certs/tls.key",
             self._stored.key,
@@ -309,16 +316,13 @@ class SeldonCoreOperator(CharmBase):
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _on_pebble_ready(self, _):
+    def _on_pebble_ready(self, event):
         """Configure started container."""
         if not self._is_container_ready():
-            return
+            raise ErrorWithStatus("Container not ready when handling pebble-ready event.  "
+                                  "Something has gone wrong", ErrorWithStatus)
 
-        # upload certs to container
-        self._upload_certs_to_container()
-
-        # proceed with other actions
-        self.main(_)
+        self.main(event)
 
     def _on_remove(self, _):
         """Remove all resources."""
@@ -442,9 +446,10 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_leader()
             self._deploy_k8s_resources()
-            if not self._is_container_ready():
-                return
+            self._upload_certs_to_container()
             self._update_layer()
+            # TODO: how do we know if _update_layer finished and the workload is now active?
+            #  We shouldn't set ActiveStatus if the workload is still restarting
         except ErrorWithStatus as error:
             self.model.unit.status = error.status
             return
