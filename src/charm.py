@@ -284,8 +284,10 @@ class SeldonCoreOperator(CharmBase):
     def _upload_certs_to_container(self):
         """Upload generated certs to container."""
         if not self._is_container_ready():
-            error_msg = "Failed to upload certs to container - unable to connect to container.  " \
-                        "This may be transient while we wait for the container to come up."
+            error_msg = (
+                "Failed to upload certs to container - unable to connect to container.  "
+                "This may be transient while we wait for the container to come up."
+            )
             self.logger.error(error_msg)
             raise ErrorWithStatus(error_msg, WaitingStatus)
 
@@ -319,8 +321,11 @@ class SeldonCoreOperator(CharmBase):
     def _on_pebble_ready(self, event):
         """Configure started container."""
         if not self._is_container_ready():
-            raise ErrorWithStatus("Container not ready when handling pebble-ready event.  "
-                                  "Something has gone wrong", ErrorWithStatus)
+            raise ErrorWithStatus(
+                "Container not ready when handling pebble-ready event.  "
+                "Something has gone wrong",
+                ErrorWithStatus,
+            )
 
         self.main(event)
 
