@@ -423,8 +423,6 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_leader()
             self._deploy_k8s_resources()
-            if not self._is_container_ready():
-                return
             self._update_layer()
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
