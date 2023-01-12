@@ -39,6 +39,7 @@ CONFIGMAP_RESOURCE_FILES = [
     "src/templates/configmap.yaml.j2",
 ]
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
+CONTAINER_CERTS_DEST = "/tmp/k8s-webhook-server/serving-certs/"
 
 
 class SeldonCoreOperator(CharmBase):
@@ -87,18 +88,16 @@ class SeldonCoreOperator(CharmBase):
             service_name=f"{self.model.app.name}",
         )
 
-        # setup events
-        self.framework.observe(self.on.upgrade_charm, self.main)
-        self.framework.observe(self.on.config_changed, self.main)
-        self.framework.observe(self.on.leader_elected, self.main)
-        self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
+        # setup events to be handled by main event handler
+        self.framework.observe(self.on.upgrade_charm, self._main_event_handler)
+        self.framework.observe(self.on.config_changed, self._main_event_handler)
 
         for rel in self.model.relations.keys():
-            self.framework.observe(self.on[rel].relation_changed, self.main)
-        # on Install event perform the same actions as on Pebble Ready event
-        # NOTE: there is a container connection check in _on_pebble_ready()
-        self.framework.observe(self.on.install, self._on_pebble_ready)
-        self.framework.observe(self.on.remove, self._on_remove)
+            self.framework.observe(self.on[rel].relation_changed, self._main_event_handler)
+
+        # setup events to be handled by specific event handlers
+        self.framework.observe(self.on.seldon_core_pebble_ready, self._pebble_ready_event_handler)
+        self.framework.observe(self.on.remove, self._remove_event_handler)
 
         # Prometheus related config
         self.prometheus_provider = MetricsEndpointProvider(
@@ -249,18 +248,6 @@ class SeldonCoreOperator(CharmBase):
 
         return Layer(layer_config)
 
-    def _is_container_ready(self):
-        """Check if connection can be made with container.
-
-        Returns: False if container is not available
-                 True if connection can be made
-        Sets maintenance status if container is not available.
-        """
-        if not self.container.can_connect():
-            self.unit.status = MaintenanceStatus("Waiting for pod startup to complete")
-            return False
-        return True
-
     def _check_leader(self):
         """Check if this unit is a leader."""
         if not self.unit.is_leader():
@@ -277,26 +264,17 @@ class SeldonCoreOperator(CharmBase):
             try:
                 self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
-            except ChangeError:
-                raise ErrorWithStatus("Failed to replan", BlockedStatus)
+            except ChangeError as err:
+                raise ErrorWithStatus(f"Failed to replan with error: {str(err)}", BlockedStatus)
 
     def _upload_certs_to_container(self):
         """Upload generated certs to container."""
-        self.container.push(
-            "/tmp/k8s-webhook-server/serving-certs/tls.key",
-            self._stored.key,
-            make_dirs=True,
-        )
-        self.container.push(
-            "/tmp/k8s-webhook-server/serving-certs/tls.crt",
-            self._stored.cert,
-            make_dirs=True,
-        )
-        self.container.push(
-            "/tmp/k8s-webhook-server/serving-certs/ca.crt",
-            self._stored.ca,
-            make_dirs=True,
-        )
+        if not self.container.can_connect():
+            raise ErrorWithStatus("Failed to upload files, container is not ready", WaitingStatus)
+
+        self.container.push(CONTAINER_CERTS_DEST + "tls.key", self._stored.key, make_dirs=True)
+        self.container.push(CONTAINER_CERTS_DEST + "tls.crt", self._stored.cert, make_dirs=True)
+        self.container.push(CONTAINER_CERTS_DEST + "ca.crt", self._stored.ca, make_dirs=True)
 
     def _deploy_k8s_resources(self) -> None:
         """Deploys K8S resources."""
@@ -309,18 +287,20 @@ class SeldonCoreOperator(CharmBase):
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _on_pebble_ready(self, _):
+    def _pebble_ready_event_handler(self, _):
         """Configure started container."""
-        if not self._is_container_ready():
-            return
+        if not self.container.can_connect():
+            # Pebble Ready event should indicate that container is available
+            raise ErrorWithStatus("Pebble is ready and container is not ready", BlockedStatus)
 
+        # container is ready
         # upload certs to container
         self._upload_certs_to_container()
 
         # proceed with other actions
-        self.main(_)
+        self._main_event_handler(_)
 
-    def _on_remove(self, _):
+    def _remove_event_handler(self, _):
         """Remove all resources."""
         self.unit.status = MaintenanceStatus("Removing K8S resources")
         k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
@@ -333,9 +313,9 @@ class SeldonCoreOperator(CharmBase):
                 self.configmap_resource_handler.lightkube_client,
                 configmap_resources_manifests,
             )
-        except ApiError as e:
-            self.logger.warning(f"Failed to delete K8S resources, with error: {e}")
-            raise e
+        except ApiError as err:
+            self.logger.error(f"Failed to delete K8S resources, with error: {err}")
+            raise err
         self.unit.status = MaintenanceStatus("K8S resources removed")
 
     def _gen_certs(self):
@@ -346,8 +326,9 @@ class SeldonCoreOperator(CharmBase):
         try:
             ssl_conf_template = open(SSL_CONFIG_FILE)
             ssl_conf = ssl_conf_template.read()
-        except IOError as error:
-            self.logger.warning(f"Failed to open SSL config file: {error}")
+        except IOError as err:
+            self.logger.warning(f"Failed to open SSL config file, error: {err}")
+            return
 
         ssl_conf = ssl_conf.replace("{{ model }}", str(model))
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -437,16 +418,17 @@ class SeldonCoreOperator(CharmBase):
             istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
 
-    def main(self, _) -> None:
-        """Perform all required actions the Charm."""
+    def _main_event_handler(self, event) -> None:
+        """Perform all required actions for the Charm."""
         try:
             self._check_leader()
             self._deploy_k8s_resources()
             if not self._is_container_ready():
                 return
             self._update_layer()
-        except ErrorWithStatus as error:
-            self.model.unit.status = error.status
+        except ErrorWithStatus as err:
+            self.model.unit.status = err.status
+            self.logger.info(f"Failed to handle {event} with error: {str(err)}")
             return
 
         self.model.unit.status = ActiveStatus()
