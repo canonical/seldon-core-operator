@@ -89,15 +89,15 @@ class SeldonCoreOperator(CharmBase):
         )
 
         # setup events to be handled by main event handler
-        self.framework.observe(self.on.upgrade_charm, self._main_event_handler)
-        self.framework.observe(self.on.config_changed, self._main_event_handler)
+        self.framework.observe(self.on.upgrade_charm, self._on_event)
+        self.framework.observe(self.on.config_changed, self._on_event)
 
         for rel in self.model.relations.keys():
-            self.framework.observe(self.on[rel].relation_changed, self._main_event_handler)
+            self.framework.observe(self.on[rel].relation_changed, self._on_event)
 
         # setup events to be handled by specific event handlers
-        self.framework.observe(self.on.seldon_core_pebble_ready, self._pebble_ready_event_handler)
-        self.framework.observe(self.on.remove, self._remove_event_handler)
+        self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
+        self.framework.observe(self.on.remove, self._on_remove)
 
         # Prometheus related config
         self.prometheus_provider = MetricsEndpointProvider(
@@ -287,7 +287,7 @@ class SeldonCoreOperator(CharmBase):
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _pebble_ready_event_handler(self, _):
+    def _on_pebble_ready(self, _):
         """Configure started container."""
         if not self.container.can_connect():
             # Pebble Ready event should indicate that container is available
@@ -298,9 +298,9 @@ class SeldonCoreOperator(CharmBase):
         self._upload_certs_to_container()
 
         # proceed with other actions
-        self._main_event_handler(_)
+        self._on_event(_)
 
-    def _remove_event_handler(self, _):
+    def _on_remove(self, _):
         """Remove all resources."""
         self.unit.status = MaintenanceStatus("Removing K8S resources")
         k8s_resources_manifests = self.k8s_resource_handler.render_manifests()
@@ -418,7 +418,7 @@ class SeldonCoreOperator(CharmBase):
             istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
 
-    def _main_event_handler(self, event) -> None:
+    def _on_event(self, event) -> None:
         """Perform all required actions for the Charm."""
         try:
             self._check_leader()
