@@ -96,6 +96,7 @@ class SeldonCoreOperator(CharmBase):
             self.framework.observe(self.on[rel].relation_changed, self._on_event)
 
         # setup events to be handled by specific event handlers
+        self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
 
@@ -286,6 +287,11 @@ class SeldonCoreOperator(CharmBase):
         except ApiError:
             raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
         self.model.unit.status = MaintenanceStatus("K8S resources created")
+
+    def _on_install(self, _):
+        """Installation only tasks."""
+        # deploy K8S resources to speed up deployment
+        self._deploy_k8s_resources()
 
     def _on_pebble_ready(self, _):
         """Configure started container."""
