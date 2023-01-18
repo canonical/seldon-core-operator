@@ -30,7 +30,16 @@ class TestCharm:
     """Test class for SeldonCoreOperator."""
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
-    def test_not_leader(self, harness: Harness):
+    @patch("charm.SeldonCoreOperator.k8s_resource_handler")
+    @patch("charm.SeldonCoreOperator.configmap_resource_handler")
+    @patch("charm.SeldonCoreOperator.crd_resource_handler")
+    def test_not_leader(
+        self,
+        _: MagicMock,  # k8s_resource_handler
+        __: MagicMock,  # configmap_resource_handler
+        ___: MagicMock,  # crd_resource_handler
+        harness: Harness,
+    ):
         """Test not a leader scenario."""
         harness.begin_with_initial_hooks()
         harness.container_pebble_ready("seldon-core")
