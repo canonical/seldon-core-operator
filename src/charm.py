@@ -9,13 +9,17 @@ import logging
 import tempfile
 from base64 import b64encode
 from pathlib import Path
-from subprocess import check_call
+from subprocess import DEVNULL, check_call
 
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.istio_pilot.v0.istio_gateway_info import GatewayRelationError, GatewayRequirer
+from charms.observability_libs.v0.metrics_endpoint_discovery import (
+    MetricsEndpointChangeCharmEvents,
+    MetricsEndpointObserver,
+)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
@@ -46,6 +50,7 @@ class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator."""
 
     _stored = StoredState()
+    on = MetricsEndpointChangeCharmEvents()
 
     def __init__(self, *args):
         """Initialize charm and setup the container."""
@@ -66,7 +71,7 @@ class SeldonCoreOperator(CharmBase):
         self._container = self.unit.get_container(self._container_name)
 
         # generate certs
-        self._stored.set_default(**self._gen_certs())
+        self._stored.set_default(**self._gen_certs(), targets={})
 
         # setup context to be used for updating K8S resources
         self._context = {
@@ -110,12 +115,21 @@ class SeldonCoreOperator(CharmBase):
                     "static_configs": [{"targets": ["*:{}".format(self.config["metrics-port"])]}],
                 }
             ],
+            lookaside_jobs_callable=self.return_list_of_running_models,
         )
 
         # Dashboard related config (Grafana)
         self.dashboard_provider = GrafanaDashboardProvider(
             charm=self,
             relation_name="grafana-dashboard",
+        )
+
+        self.metrics_server_observer = MetricsEndpointObserver(
+            self, {"seldon-deployment-id": None}
+        )
+        self.framework.observe(
+            self.on.metrics_endpoint_change,
+            self._metrics_endpoint_change,
         )
 
     @property
@@ -343,7 +357,8 @@ class SeldonCoreOperator(CharmBase):
             # execute OpenSSL commands
             check_call(["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-ca.key", "2048"])
             check_call(
-                ["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-server.key", "2048"]
+                ["openssl", "genrsa", "-out", tmp_dir + "/seldon-cert-gen-server.key", "2048"],
+                stdout=DEVNULL,
             )
             check_call(
                 [
@@ -361,7 +376,8 @@ class SeldonCoreOperator(CharmBase):
                     "/CN=127.0.0.1",
                     "-out",
                     tmp_dir + "/seldon-cert-gen-ca.crt",
-                ]
+                ],
+                stdout=DEVNULL,
             )
             check_call(
                 [
@@ -375,7 +391,8 @@ class SeldonCoreOperator(CharmBase):
                     tmp_dir + "/seldon-cert-gen-server.csr",
                     "-config",
                     tmp_dir + "/seldon-cert-gen-ssl.conf",
-                ]
+                ],
+                stdout=DEVNULL,
             )
             check_call(
                 [
@@ -398,7 +415,8 @@ class SeldonCoreOperator(CharmBase):
                     "v3_ext",
                     "-extfile",
                     tmp_dir + "/seldon-cert-gen-ssl.conf",
-                ]
+                ],
+                stdout=DEVNULL,
             )
 
             ret_certs = {
@@ -411,6 +429,12 @@ class SeldonCoreOperator(CharmBase):
             check_call(["rm", "-f", tmp_dir + "/seldon-cert-gen-*"])
 
         return ret_certs
+
+    def _metrics_endpoint_change(self, event):
+        self._stored.targets[
+            f"{event.discovered['namespace']}-{event.discovered['name']}"
+        ] = event.discovered["targets"]
+        self.prometheus_provider.set_scrape_job_spec()
 
     def _get_istio_gateway(self):
         """Parse 'gateway' relation and return Istio gateway definition in appropriate format."""
@@ -436,6 +460,9 @@ class SeldonCoreOperator(CharmBase):
             return
 
         self.model.unit.status = ActiveStatus()
+
+    def return_list_of_running_models(self):
+        return [{"running-models": [{"targets": [p for p in self._stored.targets.values()]}]}]
 
 
 #
