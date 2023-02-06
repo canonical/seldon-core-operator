@@ -63,7 +63,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 # File path where metrics endpoint change data is written for exchange
 # between the discovery process and the materialised event.
@@ -140,8 +140,8 @@ class MetricsEndpointObserver(Object):
             new_env.pop("JUJU_CONTEXT_ID")
 
         tool_prefix = f"/var/lib/juju/tools/{self.unit_tag}"
-        if juju_run_path := Path(tool_prefix, "juju-run").exists():
-            tool_path = juju_run_path
+        if Path(tool_prefix, "juju-run").exists():
+            tool_path = Path(tool_prefix, "juju-run")
         else:
             tool_path = Path("/usr/bin/juju-exec")
 

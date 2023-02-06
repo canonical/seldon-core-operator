@@ -464,6 +464,7 @@ class SeldonCoreOperator(CharmBase):
         self.model.unit.status = ActiveStatus()
 
     def return_list_of_running_models(self):
+        """Return the models and targets for endpoint discovery."""
         return [{"running-models": [{"targets": [p for p in self._stored.targets.values()]}]}]
 
 
