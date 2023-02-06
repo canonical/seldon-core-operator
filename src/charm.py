@@ -431,9 +431,11 @@ class SeldonCoreOperator(CharmBase):
         return ret_certs
 
     def _metrics_endpoint_change(self, event):
-        self._stored.targets[
-            f"{event.discovered['namespace']}-{event.discovered['name']}"
-        ] = event.discovered["targets"]
+        k = f"{event.discovered['namespace']}-{event.discovered['name']}"
+        if event.discovered["change"] == "DELETED" and self._stored.targets.get(k, ""):
+            del self._stored.targets[k]
+        else:
+            self._stored.targets[k] = event.discovered["targets"]
         self.prometheus_provider.set_scrape_job_spec()
 
     def _get_istio_gateway(self):
