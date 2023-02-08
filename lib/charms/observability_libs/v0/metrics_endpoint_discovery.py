@@ -46,7 +46,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, cast
+from typing import Dict, Iterable
 
 from lightkube import Client
 from lightkube.resources.core_v1 import Pod
