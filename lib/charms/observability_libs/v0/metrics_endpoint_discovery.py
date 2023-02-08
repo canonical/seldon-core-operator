@@ -51,7 +51,7 @@ from typing import Dict, Iterable
 from lightkube import Client
 from lightkube.resources.core_v1 import Pod
 from ops.charm import CharmBase, CharmEvents
-from ops.framework import EventBase, EventSource, Object
+from ops.framework import EventBase, EventSource, Object, StoredState
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,9 @@ class MetricsEndpointObserver(Object):
     Observed endpoint changes cause :class"`MetricsEndpointChangeEvent` to be emitted.
     """
 
+    # Yes, we need this so we can track it between events
+    _stored = StoredState()
+
     def __init__(self, charm: CharmBase, labels: Dict[str, Iterable]):
         """Constructor for MetricsEndpointObserver.
 
@@ -122,9 +125,10 @@ class MetricsEndpointObserver(Object):
             labels: dictionary of label/value to be observed for changing metrics endpoints.
         """
         super().__init__(charm, "metrics-endpoint-observer")
+        self._stored.set_default(observer_pid=0)
 
         self._charm = charm
-        self._observer_pid = 0
+        self._observer_pid = self._stored.observer_pid
 
         self._labels = labels
         self.start_observer()
@@ -139,11 +143,11 @@ class MetricsEndpointObserver(Object):
         if "JUJU_CONTEXT_ID" in new_env:
             new_env.pop("JUJU_CONTEXT_ID")
 
-        tool_prefix = f"/var/lib/juju/tools/{self.unit_tag}"
+        tool_prefix = "/usr/bin"
         if Path(tool_prefix, "juju-run").exists():
             tool_path = Path(tool_prefix, "juju-run")
         else:
-            tool_path = Path("/usr/bin/juju-exec")
+            tool_path = Path(tool_prefix, "juju-exec")
 
         pid = subprocess.Popen(
             [
