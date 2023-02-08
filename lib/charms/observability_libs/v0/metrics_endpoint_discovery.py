@@ -46,7 +46,7 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import Dict, Iterable, cast
 
 from lightkube import Client
 from lightkube.resources.core_v1 import Pod
@@ -164,15 +164,15 @@ class MetricsEndpointObserver(Object):
             env=new_env,
         ).pid
 
-        self._observer_pid = pid
+        self._observer_pid = pid  # type: ignore
 
     def stop_observer(self):
         """Stop the running observer process if we have previously started it."""
-        if not self._observer_pid:
+        if not self._observer_pid:  # type: ignore
             return
 
         try:
-            os.kill(self._observer_pid, signal.SIGINT)
+            os.kill(self._observer_pid, signal.SIGINT)  # type: ignore
             msg = "Stopped running metrics endpoint observer process with PID {}"
             logging.info(msg.format(self._observer_pid))
         except OSError:
