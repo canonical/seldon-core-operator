@@ -1,11 +1,12 @@
-## Seldon Core Operator - a component of the Charmed Kubeflow distribution from Canonical
+# Seldon Core Operator
 
-This repository hosts the Kubernetes Python Operator for Seldon Core
-(see [CharmHub](https://charmhub.io/?q=seldon-core)).
+[![Seldon Core Operator](https://charmhub.io/seldon-core/badge.svg)](https://charmhub.io/seldon-core)
 
-The Seldon Core Operator is a Python script that wraps the latest released Seldon Core manifest, providing lifecycle management and handling events (install, upgrade, integrate, remove).
+## Description
 
-### Usage
+The Seldon Core Charmed Operator for Juju enables fast and easy deployment of models and experiments at scale as an integral part of Charmed Kubeflow. Also it handles installation, scaling, and configuraion.
+
+## Usage
 
 The Seldon Core Operator may be deployed using the Juju command line as
 follows
