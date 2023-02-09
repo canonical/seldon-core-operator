@@ -4,7 +4,7 @@
 
 ## Description
 
-The Seldon Core Charmed Operator for Juju enables fast and easy deployment of models and experiments at scale as an integral part of Charmed Kubeflow. Also it handles installation, scaling, and configuraion.
+The Seldon Core Charmed Operator for Juju enables fast and easy deployment of models and experiments at scale as an integral part of Charmed Kubeflow. Also it handles installation, scaling, and configuration.
 
 ## Usage
 
