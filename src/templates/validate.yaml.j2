@@ -1,13 +1,8 @@
-# Source: seldon-core-operator/templates/webhook.yaml
+# Source: seldon-core/operator/config/webhook/manifests.yaml
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  labels:
-    app: seldon
-    app.kubernetes.io/instance: 'seldon-core'
-    app.kubernetes.io/name: 'seldon-core-operator'
-    app.kubernetes.io/version: '1.14.0'
-  name: seldon-validating-webhook-configuration-kubeflow
+  name: seldon-validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1
@@ -21,12 +16,6 @@ webhooks:
       path: /validate-machinelearning-seldon-io-v1-seldondeployment
   failurePolicy: Fail
   name: v1.vseldondeployment.kb.io
-  namespaceSelector:
-    matchExpressions:
-    - key: seldon.io/controller-id
-      operator: DoesNotExist
-    matchLabels:
-      serving.kubeflow.org/inferenceservice: enabled
   rules:
   - apiGroups:
     - machinelearning.seldon.io
