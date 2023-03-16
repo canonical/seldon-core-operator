@@ -279,8 +279,8 @@ class SeldonCoreOperator(CharmBase):
             try:
                 self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
-            except ChangeError as err:
-                raise ErrorWithStatus(f"Failed to replan with error: {str(err)}", BlockedStatus)
+            except ChangeError as e:
+                raise ChangeError("Failed to replan") from e
 
     def _upload_certs_to_container(self):
         """Upload generated certs to container."""
@@ -298,8 +298,8 @@ class SeldonCoreOperator(CharmBase):
             self.k8s_resource_handler.apply()
             self.crd_resource_handler.apply()
             self.configmap_resource_handler.apply()
-        except ApiError:
-            raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
+        except ApiError as e:
+            raise ApiError("Failed to create K8S resources") from e
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
     def _on_install(self, _):
