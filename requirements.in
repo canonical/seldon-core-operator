@@ -3,5 +3,4 @@ lightkube
 lightkube-models
 ops
 oci-image
-serialized-data-interface
 tenacity
