@@ -2,5 +2,4 @@ charmed-kubeflow-chisme
 lightkube
 lightkube-models
 ops
-oci-image
 tenacity
