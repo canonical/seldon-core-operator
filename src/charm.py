@@ -297,7 +297,7 @@ class SeldonCoreOperator(CharmBase):
     def _upload_certs_to_container(self):
         """Upload generated certs to container."""
         try:
-           self._check_container_connection(self.container)
+            self._check_container_connection(self.container)
         except ErrorWithStatus as error:
             self.model.unit = error.status
             return
