@@ -330,7 +330,7 @@ class SeldonCoreOperator(CharmBase):
                 # conflict detected when applying K8S resources
                 # re-apply K8S resources with forced conflict resolution
                 self.unit.status = MaintenanceStatus("Force applying K8S resources")
-                self.logger.warning("Applying K8S resources with conflict resolution")
+                self.logger.warning("Apply K8S resources with forced changes against conflicts")
                 self.k8s_resource_handler.apply(force=force_conflicts)
             else:
                 raise GenericCharmRuntimeError("K8S resources creation failed") from error
@@ -341,7 +341,7 @@ class SeldonCoreOperator(CharmBase):
                 # conflict detected when applying CRD resources
                 # re-apply CRD resources with forced conflict resolution
                 self.unit.status = MaintenanceStatus("Force applying CRD resources")
-                self.logger.warning("Applying CRD resources with conflict resolution")
+                self.logger.warning("Apply CRD resources with forced changes against conflicts")
                 self.crd_resource_handler.apply(force=force_conflicts)
             else:
                 raise GenericCharmRuntimeError("CRD resources creation failed") from error
@@ -352,7 +352,7 @@ class SeldonCoreOperator(CharmBase):
                 # conflict detected when applying ConfigMap resources
                 # re-apply ConfigMap resources with forced conflict resolution
                 self.unit.status = MaintenanceStatus("Force applying ConfigMap resources")
-                self.logger.warning("Applying ConfigMap resources with conflict resolution")
+                self.logger.warning("Apply ConfigMap with forced changes against conflicts")
                 self.configmap_resource_handler.apply(force=force_conflicts)
             else:
                 raise GenericCharmRuntimeError("ConfigMap resources creation failed") from error
