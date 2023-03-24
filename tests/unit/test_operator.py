@@ -190,7 +190,7 @@ class TestCharm:
         "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
         lambda x: True,
     )
-    def test_deploy_k8s_resources_success(
+    def test_apply_k8s_resources_success(
         self,
         k8s_resource_handler: MagicMock,
         configmap_resource_handler: MagicMock,
@@ -199,7 +199,7 @@ class TestCharm:
     ):
         """Test if K8S resource handler is executed as expected."""
         harness.begin()
-        harness.charm._deploy_k8s_resources()
+        harness.charm._apply_k8s_resources()
         crd_resource_handler.apply.assert_called()
         k8s_resource_handler.apply.assert_called()
         configmap_resource_handler.apply.assert_called()
