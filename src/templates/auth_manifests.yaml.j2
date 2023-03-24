@@ -377,3 +377,23 @@ subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
   namespace: {{ namespace }}
+---
+# This aggregation role was removed in kubeflow/manifests/ in version 1.7.0
+# but we are keeping it because of issue #113
+# Kubeflow builds clusterrole kubeflow-edit by aggreagating multiple other clusterroles
+# So i add a clusterrole that allows seldon deployments and it will be aggreagted because
+# of its "aggregate-to-kubeflow-edit" label
+# kubeflow-edit is the default role, that is available in each user namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    rbac.authorization.kubeflow.org/aggregate-to-kubeflow-edit: "true"
+  name: kubeflow-edit-seldon
+rules:
+- apiGroups:
+    - machinelearning.seldon.io
+  verbs:
+    - '*'
+  resources:
+    - '*'
