@@ -294,7 +294,7 @@ class SeldonCoreOperator(CharmBase):
     def _check_and_report_k8s_conflict(self, error):
         """Return True if error status code is 409 (conflict), False otherwise."""
         if error.status.code == 409:
-            self.logger.warning(f"Encountered a conflict: {str(error)}")
+            self.logger.warning(f"Encountered a conflict: {error}")
             return True
         return False
 
