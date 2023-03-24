@@ -11,7 +11,7 @@ from base64 import b64encode
 from pathlib import Path
 from subprocess import DEVNULL, check_call
 
-from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
@@ -28,7 +28,7 @@ from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, Container, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
 
 K8S_RESOURCE_FILES = [
@@ -279,13 +279,28 @@ class SeldonCoreOperator(CharmBase):
             try:
                 self.logger.info("Pebble plan updated with new configuration, replaning")
                 self.container.replan()
-            except ChangeError as err:
-                raise ErrorWithStatus(f"Failed to replan with error: {str(err)}", BlockedStatus)
+            except ChangeError as e:
+                raise GenericCharmRuntimeError("Failed to replan") from e
+
+    def _check_container_connection(self, container: Container) -> None:
+        """Check if connection can be made with container.
+
+        Args:
+            container: the named container in a unit to check.
+
+        Raises:
+            ErrorWithStatus if the connection cannot be made.
+        """
+        if not container.can_connect():
+            raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
 
     def _upload_certs_to_container(self):
         """Upload generated certs to container."""
-        if not self.container.can_connect():
-            raise ErrorWithStatus("Failed to upload files, container is not ready", WaitingStatus)
+        try:
+            self._check_container_connection(self.container)
+        except ErrorWithStatus as error:
+            self.model.unit = error.status
+            return
 
         self.container.push(CONTAINER_CERTS_DEST + "tls.key", self._stored.key, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "tls.crt", self._stored.cert, make_dirs=True)
@@ -298,8 +313,8 @@ class SeldonCoreOperator(CharmBase):
             self.k8s_resource_handler.apply()
             self.crd_resource_handler.apply()
             self.configmap_resource_handler.apply()
-        except ApiError:
-            raise ErrorWithStatus("K8S resources creation failed", BlockedStatus)
+        except ApiError as e:
+            raise GenericCharmRuntimeError("Failed to create K8S resources") from e
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
     def _on_install(self, _):
@@ -307,18 +322,21 @@ class SeldonCoreOperator(CharmBase):
         # deploy K8S resources to speed up deployment
         self._deploy_k8s_resources()
 
-    def _on_pebble_ready(self, _):
+    def _on_pebble_ready(self, event):
         """Configure started container."""
-        if not self.container.can_connect():
-            # Pebble Ready event should indicate that container is available
-            raise ErrorWithStatus("Pebble is ready and container is not ready", BlockedStatus)
+        # TODO: extract try/except to _check_container_connection()
+        try:
+            self._check_container_connection(self.container)
+        except ErrorWithStatus as error:
+            self.model.unit = error.status
+            return
 
         # container is ready
         # upload certs to container
         self._upload_certs_to_container()
 
         # proceed with other actions
-        self._on_event(_)
+        self._on_event(event)
 
     def _on_remove(self, _):
         """Remove all resources."""
