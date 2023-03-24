@@ -324,7 +324,12 @@ class SeldonCoreOperator(CharmBase):
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
-        self._check_container_connection(self.container)
+        # TODO: extract try/except to _check_container_connection()
+        try:
+            self._check_container_connection(self.container)
+        except ErrorWithStatus as error:
+            self.model.unit = error.status
+            return
 
         # container is ready
         # upload certs to container
