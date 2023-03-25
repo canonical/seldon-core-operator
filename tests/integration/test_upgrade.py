@@ -66,7 +66,7 @@ async def test_upgrade(ops_test: OpsTest):
     # wait for application to be idle for 60 seconds, because seldon-core workload creates an empty
     # configmap that tracks its leadership and expires in 45 seconds
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=60
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=120
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
