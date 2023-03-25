@@ -40,7 +40,8 @@ async def test_upgrade(ops_test: OpsTest):
     Main flow of the test:
     - Build charm to be tested, i.e. to be upgraded to.
     - Download and deploy stable version of the same charm and store it in the same location as the
-      charm to be tested (juju refresh of local charm requires local charms to be in the same path)
+      charm to be tested (juju refresh of local charm requires local charms to be in the same
+      path). Note that stable/1.14 version should be deployed without "trust"
     - Refresh the deployed stable charm to the charm to be tested.
     - Verify that charm is active and all resources are upgraded/intact.
     """
@@ -58,7 +59,7 @@ async def test_upgrade(ops_test: OpsTest):
     assert juju_download_result == 0
 
     await ops_test.model.deploy(
-        stable_charm, resources=stable_charm_resources, application_name=APP_NAME, trust=True
+        stable_charm, resources=stable_charm_resources, application_name=APP_NAME
     )
 
     # wait for application to be idle for 60 seconds, because seldon-core workload creates an empty

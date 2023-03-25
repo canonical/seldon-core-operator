@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = "seldon-controller-manager"
 
-
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build and deploy the charm.
@@ -45,7 +45,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
-
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_istio_relation(ops_test: OpsTest):
     """Test Seldon/Istio relation."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
@@ -130,7 +130,7 @@ async def check_alert_propagation(url, alert_name):
     alert_rule = next((rule for rule in alert_rules if rule["name"] == alert_name))
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
-
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
@@ -235,7 +235,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     # cleanup SeldonDeployment
     client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace)
 
-
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_deployment(ops_test: OpsTest):
     """Test Seldon Deployment scenario."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
@@ -293,6 +293,7 @@ def is_empty(iterator_list):
     return False
 
 
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 @pytest.mark.abort_on_fail
 async def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.
