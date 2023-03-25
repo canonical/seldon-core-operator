@@ -42,6 +42,7 @@ async def test_upgrade(ops_test: OpsTest):
     - Download and deploy stable version of the same charm and store it in the same location as the
       charm to be tested (juju refresh of local charm requires local charms to be in the same
       path). Note that stable/1.14 version should be deployed without "trust"
+    - Enable trust for the stable charm.
     - Refresh the deployed stable charm to the charm to be tested.
     - Verify that charm is active and all resources are upgraded/intact.
     """
@@ -68,6 +69,10 @@ async def test_upgrade(ops_test: OpsTest):
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=60
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
+
+    # enable trust (needed because 1.14 was deployed without trust)
+    juju_trust_result, _, __ = await ops_test.juju("trust", APP_NAME, f"--scope=cluster")
+    assert juju_trust_result == 0
 
     # refresh (upgrade) using locally built charm
     # NOTE: using ops_test.juju() because there is no functionality to refresh in ops_test
