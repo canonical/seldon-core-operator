@@ -95,7 +95,7 @@ class SeldonCoreOperator(CharmBase):
 
         # setup events to be handled by main event handler
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.config_changed, self._on_event)
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self._on_event)

@@ -60,7 +60,7 @@ async def test_upgrade(ops_test: OpsTest):
     assert juju_download_result == 0
 
     await ops_test.model.deploy(
-        stable_charm, resources=stable_charm_resources, application_name=APP_NAME
+        stable_charm, resources=stable_charm_resources, application_name=APP_NAME, trust=True
     )
 
     # wait for application to be idle for 60 seconds, because seldon-core workload creates an empty

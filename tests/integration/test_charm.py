@@ -130,6 +130,7 @@ async def check_alert_propagation(url, alert_name):
     alert_rule = next((rule for rule in alert_rules if rule["name"] == alert_name))
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
+
 @pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
