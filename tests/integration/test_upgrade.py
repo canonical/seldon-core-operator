@@ -10,7 +10,7 @@ required to test upgrade/refresh properly without cluttering other integraiton t
 
 import logging
 from pathlib import Path
-
+import time
 import pytest
 import yaml
 from lightkube import ApiError, Client
@@ -73,6 +73,7 @@ async def test_upgrade(ops_test: OpsTest):
     # enable trust (needed because 1.14 was deployed without trust)
     juju_trust_result, _, __ = await ops_test.juju("trust", APP_NAME, f"--scope=cluster")
     assert juju_trust_result == 0
+    time.sleep(120)
 
     # refresh (upgrade) using locally built charm
     # NOTE: using ops_test.juju() because there is no functionality to refresh in ops_test
