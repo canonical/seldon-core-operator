@@ -95,7 +95,7 @@ class SeldonCoreOperator(CharmBase):
 
         # setup events to be handled by main event handler
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.config_changed, self._on_event)
 
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self._on_event)
@@ -381,21 +381,8 @@ class SeldonCoreOperator(CharmBase):
 
     def _on_upgrade(self, _):
         """Perform upgrade steps."""
-        # upload certs to container
-        if self.container.can_connect():
-            self._upload_certs_to_container()
-
         # force conflict resolution in K8S resources update
         self._on_event(_, force_conflicts=True)
-
-    def _on_config_changed(self, _):
-        """Perform steps required for config-changed event."""
-        # upload certs to container
-        if self.container.can_connect():
-            self._upload_certs_to_container()
-
-        # proceed with other actions
-        self._on_event(_)
 
     def _on_remove(self, _):
         """Remove all resources."""
