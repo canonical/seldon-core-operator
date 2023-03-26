@@ -33,10 +33,6 @@ class TestCharm:
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
     @patch("charm.SeldonCoreOperator.crd_resource_handler")
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_not_leader(
         self,
         _: MagicMock,  # k8s_resource_handler
@@ -53,10 +49,6 @@ class TestCharm:
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
     @patch("charm.SeldonCoreOperator.crd_resource_handler")
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_no_relation(
         self,
         _: MagicMock,  # k8s_resource_handler
@@ -80,10 +72,6 @@ class TestCharm:
         assert harness.charm.model.unit.status == ActiveStatus("")
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_prometheus_data_set(self, harness: Harness, mocker):
         """Test Prometheus data setting."""
         harness.set_leader(True)
@@ -152,10 +140,6 @@ class TestCharm:
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
     @patch("charm.SeldonCoreOperator.crd_resource_handler")
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_pebble_layer(
         self,
         _: MagicMock,  # k8s_resource_handler
@@ -186,10 +170,6 @@ class TestCharm:
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
     @patch("charm.SeldonCoreOperator.crd_resource_handler")
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_deploy_k8s_resources_success(
         self,
         k8s_resource_handler: MagicMock,
@@ -206,10 +186,6 @@ class TestCharm:
         assert isinstance(harness.charm.model.unit.status, MaintenanceStatus)
 
     @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_get_certs(self, harness: Harness):
         """Test certs generation."""
         harness.begin()
@@ -225,10 +201,6 @@ class TestCharm:
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
     @patch("charm.SeldonCoreOperator.crd_resource_handler")
-    @patch(
-        "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
-        lambda x: True,
-    )
     def test_istio_relation(
         self,
         _: MagicMock,  # k8s_resource_handler
