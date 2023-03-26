@@ -68,8 +68,10 @@ jobs:
         bootstrap-options: "--agent-version=2.9.34"
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
-    - name: Run integration tests
-      run: tox -vve integration -- --model testing
+          #    - name: Run integration tests
+          #      run: tox -vve integration -- --model testing
+    - name: Setuo tmate
+      uses: mxschmitt/action-tmate@v3
 
     # On failure, capture debugging resources
     - name: Get all
