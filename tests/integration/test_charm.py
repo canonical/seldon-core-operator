@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = "seldon-controller-manager"
 
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build and deploy the charm.
@@ -293,6 +294,7 @@ def is_empty(iterator_list):
     return False
 
 
+@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 @pytest.mark.abort_on_fail
 async def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.

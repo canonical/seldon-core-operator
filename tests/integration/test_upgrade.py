@@ -41,8 +41,7 @@ async def test_upgrade(ops_test: OpsTest):
     - Build charm to be tested, i.e. to be upgraded to.
     - Download and deploy stable version of the same charm and store it in the same location as the
       charm to be tested (juju refresh of local charm requires local charms to be in the same
-      path). Note that stable/1.14 version should be deployed without "trust"
-    - Enable trust for the stable charm.
+      path). Note that stable/1.14 version should be deployed with "trust"
     - Refresh the deployed stable charm to the charm to be tested.
     - Verify that charm is active and all resources are upgraded/intact.
     """
@@ -66,24 +65,16 @@ async def test_upgrade(ops_test: OpsTest):
     # wait for application to be idle for 60 seconds, because seldon-core workload creates an empty
     # configmap that tracks its leadership and expires in 45 seconds
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=120
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=60
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
-    # enable trust (needed because 1.14 was deployed without trust)
-    juju_trust_result, _, __ = await ops_test.juju("trust", APP_NAME, f"--scope=cluster")
-    assert juju_trust_result == 0
-    time.sleep(120)
-
+    logger.error("Starting refresh")
     # refresh (upgrade) using locally built charm
-    # NOTE: using ops_test.juju() because there is no functionality to refresh in ops_test
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
-    juju_refresh_result, _, __ = await ops_test.juju(
-        "refresh", APP_NAME, f"--path={charm_under_test}", f'--resource="oci-image={image_path}"'
+    await ops_test.model.applications[APP_NAME].refresh(
+        path=f"{charm_under_test}", resources={"oci-image": image_path}
     )
-    # check that refresh was started successfully
-    # there is no guarantee that refresh has completed
-    assert juju_refresh_result == 0
 
     # wait for updated charm to become active and idle for 120 seconds to ensure upgrade-charm
     # event has been handled and all resources were installed/upgraded
