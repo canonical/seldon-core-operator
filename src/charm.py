@@ -381,6 +381,10 @@ class SeldonCoreOperator(CharmBase):
 
     def _on_upgrade(self, _):
         """Perform upgrade steps."""
+        # upload certs to container
+        if self.container.can_connect():
+            self._upload_certs_to_container()
+
         # force conflict resolution in K8S resources update
         self._on_event(_, force_conflicts=True)
 

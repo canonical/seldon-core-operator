@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = "seldon-controller-manager"
 
+
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
     """Build and deploy the charm.
@@ -43,6 +44,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=30
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
+
 
 @pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_istio_relation(ops_test: OpsTest):
@@ -235,6 +237,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     # cleanup SeldonDeployment
     client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace)
 
+
 @pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_deployment(ops_test: OpsTest):
     """Test Seldon Deployment scenario."""
@@ -291,6 +294,7 @@ def is_empty(iterator_list):
         # iterator is empty
         return True
     return False
+
 
 @pytest.mark.abort_on_fail
 async def test_remove_with_resources_present(ops_test: OpsTest):

@@ -10,7 +10,7 @@ upgrade/refresh properly without cluttering other integraiton tests.
 
 import logging
 from pathlib import Path
-import time
+
 import pytest
 import yaml
 from lightkube import ApiError, Client
@@ -25,11 +25,11 @@ APP_NAME = "seldon-controller-manager"
 
 
 # Skip upgrade test, because it is failing in CI due to authorization issues.
-# Manual test instructions for upgrade is provided in corresponding Github issue:
+# Manual test instructions for upgrade are provided in corresponding Github issue:
 # https://github.com/canonical/seldon-core-operator/issues/101
 # Upgrade test can be executed locally.
 # TO-DO Ensure upgrade test passes in CI environment.
-@pytest.mark.skip(reason="Skip due to authorization issues in CI.")
+# @pytest.mark.skip(reason="Skip due to authorization issues in CI.")
 @pytest.mark.abort_on_fail
 async def test_upgrade(ops_test: OpsTest):
     """Test upgrade.
