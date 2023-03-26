@@ -46,7 +46,6 @@ async def test_build_and_deploy(ops_test: OpsTest):
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
 
-@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_istio_relation(ops_test: OpsTest):
     """Test Seldon/Istio relation."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
@@ -132,7 +131,6 @@ async def check_alert_propagation(url, alert_name):
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
 
-@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
@@ -238,7 +236,6 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace)
 
 
-@pytest.mark.skip(reason="IC: skipping due to remove/update dev")
 async def test_seldon_deployment(ops_test: OpsTest):
     """Test Seldon Deployment scenario."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
