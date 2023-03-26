@@ -81,7 +81,7 @@ async def test_upgrade(ops_test: OpsTest):
     # NOTE: when charm reaches active-idle state, upgrade-event might not have been handled yet
     # and/or installation of resources might not be completed
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=120
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=180
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
