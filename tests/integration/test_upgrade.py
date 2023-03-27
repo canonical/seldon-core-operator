@@ -29,7 +29,7 @@ APP_NAME = "seldon-controller-manager"
 # https://github.com/canonical/seldon-core-operator/issues/101
 # Upgrade test can be executed locally.
 # TO-DO Ensure upgrade test passes in CI environment.
-@pytest.mark.skip(reason="Skip due to authorization issues in CI.")
+# @pytest.mark.skip(reason="Skip due to authorization issues in CI.")
 @pytest.mark.abort_on_fail
 async def test_upgrade(ops_test: OpsTest):
     """Test upgrade.
@@ -112,7 +112,7 @@ async def test_upgrade(ops_test: OpsTest):
     assert len(test_crd_names) == 1
     assert cluster_crd.metadata.name in test_crd_names[0]
     # there should be no 'annotations' in this version of CRD
-    assert cluster_crd.metadata.annotations
+    assert cluster_crd.metadata.annotations is None
 
     # verify that ConfigMap is installed
     try:
