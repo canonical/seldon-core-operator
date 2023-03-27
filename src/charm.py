@@ -321,7 +321,7 @@ class SeldonCoreOperator(CharmBase):
             )
         except ApiError as err:
             # do not log/report when resources were not found
-            if error.status.code != 404:
+            if err.status.code != 404:
                 self.logger.error(f"Failed to delete K8S resources, with error: {err}")
                 raise err
         self.unit.status = MaintenanceStatus("K8S resources removed")
