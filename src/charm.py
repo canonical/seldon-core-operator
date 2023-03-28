@@ -16,10 +16,6 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.istio_pilot.v0.istio_gateway_info import GatewayRelationError, GatewayRequirer
-from charms.observability_libs.v0.metrics_endpoint_discovery import (
-    MetricsEndpointChangeCharmEvents,
-    MetricsEndpointObserver,
-)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
@@ -50,7 +46,6 @@ class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator."""
 
     _stored = StoredState()
-    on = MetricsEndpointChangeCharmEvents()
 
     def __init__(self, *args):
         """Initialize charm and setup the container."""
@@ -121,14 +116,6 @@ class SeldonCoreOperator(CharmBase):
         self.dashboard_provider = GrafanaDashboardProvider(
             charm=self,
             relation_name="grafana-dashboard",
-        )
-
-        self.metrics_server_observer = MetricsEndpointObserver(
-            self, {"seldon-deployment-id": None}
-        )
-        self.framework.observe(
-            self.on.metrics_endpoint_change,
-            self._metrics_endpoint_change,
         )
 
     @property
@@ -498,14 +485,6 @@ class SeldonCoreOperator(CharmBase):
             check_call(["rm", "-f", tmp_dir + "/seldon-cert-gen-*"])
 
         return ret_certs
-
-    def _metrics_endpoint_change(self, event):
-        k = f"{event.discovered['namespace']}-{event.discovered['name']}"
-        if event.discovered["change"] == "DELETED" and self._stored.targets.get(k, ""):
-            del self._stored.targets[k]
-        else:
-            self._stored.targets[k] = event.discovered["targets"]
-        self.prometheus_provider.set_scrape_job_spec()
 
     def _get_istio_gateway(self):
         """Parse 'gateway' relation and return Istio gateway definition in appropriate format."""
