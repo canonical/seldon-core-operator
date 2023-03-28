@@ -285,7 +285,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_container_connection(self.container)
         except ErrorWithStatus as error:
-            self.model.unit = error.status
+            self.model.unit.status = error.status
             return
 
         self.container.push(CONTAINER_CERTS_DEST + "tls.key", self._stored.key, make_dirs=True)
@@ -355,7 +355,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_container_connection(self.container)
         except ErrorWithStatus as error:
-            self.model.unit = error.status
+            self.model.unit.status = error.status
             return
 
         # container is ready

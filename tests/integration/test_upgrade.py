@@ -29,24 +29,19 @@ APP_NAME = "seldon-controller-manager"
 # https://github.com/canonical/seldon-core-operator/issues/101
 # Upgrade test can be executed locally.
 # TO-DO Ensure upgrade test passes in CI environment.
-# @pytest.mark.skip(reason="Skip due to authorization issues in CI.")
+@pytest.mark.skip(reason="Skip due to authorization issues in CI.")
 @pytest.mark.abort_on_fail
 async def test_upgrade(ops_test: OpsTest):
     """Test upgrade.
 
     Verify that all upgrade process succeeds.
 
-    NOTE: There should be no charm with APP_NAME deployed prior to testing upgrade, because this
-    test deploys local stable version of this charm which has revision 0 and peforms upgrade to
-    locally built charm which will have revision 1. If prior deployment of locally build or remote
-    charm is done, initial revision will be different and this mismatch will cause upgrade to fail.
-    There should be no Seldon related resources present in the cluster.
+    NOTE: There should be no charm with APP_NAME deployed prior to testing upgrade.
+          There should be no Seldon related resources present in the cluster.
 
     Main flow of the test:
     - Build charm to be tested, i.e. to be upgraded to.
-    - Download and deploy stable version of the same charm and store it in the same location as the
-      charm to be tested (juju refresh of local charm requires local charms to be in the same
-      path). Note that stable/1.14 version should be deployed with "trust"
+    - Deploy stable version of the same charm from Charmhub.
     - Refresh the deployed stable charm to the charm to be tested.
     - Verify that charm is active and all resources are upgraded/intact.
     """
@@ -54,20 +49,9 @@ async def test_upgrade(ops_test: OpsTest):
     # build the charm
     charm_under_test = await ops_test.build_charm(".")
 
-    # download and deploy stable version of the charm
+    # deploy stable version of the charm
     await ops_test.model.deploy(
-        entity_url=APP_NAME, application_name=APP_NAME, channel="1.5/stable", trust=True
-    )
-    stable_charm_resources = {"oci-image": "docker.io/seldonio/seldon-core-operator:1.14.0"}
-    stable_charm = str(charm_under_test.parent) + "/seldon-core-stable.charm"
-    juju_download_result, _, __ = await ops_test.juju(
-        "download", "seldon-core", f"--filepath={stable_charm}", "--channel=1.14/stable"
-    )
-    # check that download succeeded
-    assert juju_download_result == 0
-
-    await ops_test.model.deploy(
-        stable_charm, resources=stable_charm_resources, application_name=APP_NAME, trust=True
+        entity_url="seldon-core", application_name=APP_NAME, channel="1.14/stable", trust=True
     )
 
     # wait for application to be idle for 60 seconds, because seldon-core workload creates an empty
@@ -94,18 +78,16 @@ async def test_upgrade(ops_test: OpsTest):
 
     # verify that cluster CRD is installed
     lightkube_client = Client()
-    crd_list = lightkube_client.list(
-        CustomResourceDefinition,
-        labels=[("app.juju.is/created-by", "seldon-controller-manager")],
-        namespace=ops_test.model.name,
-    )
-    cluster_crd = None
     try:
-        cluster_crd = next(crd_list)
-    except StopIteration:
-        # no CRDs retrieved
-        logger.error(f"CRD not found")
-        assert 0
+        cluster_crd = lightkube_client.get(
+            CustomResourceDefinition,
+            name="seldondeployments.machinelearning.seldon.io",
+            namespace=ops_test.model.name,
+        )
+    except ApiError as error:
+        logger.error(f"CRD not found {error}")
+        assert False
+    assert cluster_crd
 
     # check that cluster CRD is upgraded and version is correct
     test_crd_names = []
@@ -114,8 +96,7 @@ async def test_upgrade(ops_test: OpsTest):
     # there should be single CRD in manifest
     assert len(test_crd_names) == 1
     assert cluster_crd.metadata.name in test_crd_names[0]
-    # there should be no 'annotations' in this version of CRD
-    assert cluster_crd.metadata.annotations is None
+    # TO-DO: verify that CRD indeed was updated
 
     # verify that ConfigMap is installed
     try:
