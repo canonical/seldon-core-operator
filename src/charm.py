@@ -89,14 +89,13 @@ class SeldonCoreOperator(CharmBase):
         )
 
         # setup events to be handled by main event handler
-        self.framework.observe(self.on.upgrade_charm, self._on_event)
         self.framework.observe(self.on.config_changed, self._on_event)
-
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self._on_event)
 
         # setup events to be handled by specific event handlers
         self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade)
         self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
 
@@ -286,28 +285,69 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_container_connection(self.container)
         except ErrorWithStatus as error:
-            self.model.unit = error.status
+            self.model.unit.status = error.status
             return
 
         self.container.push(CONTAINER_CERTS_DEST + "tls.key", self._stored.key, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "tls.crt", self._stored.cert, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "ca.crt", self._stored.ca, make_dirs=True)
 
-    def _deploy_k8s_resources(self) -> None:
-        """Deploys K8S resources."""
+    def _check_and_report_k8s_conflict(self, error):
+        """Return True if error status code is 409 (conflict), False otherwise."""
+        if error.status.code == 409:
+            self.logger.warning(f"Encountered a conflict: {error}")
+            return True
+        return False
+
+    def _apply_k8s_resources(self, force_conflicts: bool = False) -> None:
+        """Apply K8S resources.
+
+        Args:
+            force_conflicts (bool): *(optional)* Will "force" apply requests causing conflicting
+                                    fields to change ownership to the field manager used in this
+                                    charm.
+                                    NOTE: This will only be used if initial regular apply() fails.
+        """
+        self.unit.status = MaintenanceStatus("Creating K8S resources")
         try:
-            self.unit.status = MaintenanceStatus("Creating K8S resources")
             self.k8s_resource_handler.apply()
+        except ApiError as error:
+            if self._check_and_report_k8s_conflict(error) and force_conflicts:
+                # conflict detected when applying K8S resources
+                # re-apply K8S resources with forced conflict resolution
+                self.unit.status = MaintenanceStatus("Force applying K8S resources")
+                self.logger.warning("Apply K8S resources with forced changes against conflicts")
+                self.k8s_resource_handler.apply(force=force_conflicts)
+            else:
+                raise GenericCharmRuntimeError("K8S resources creation failed") from error
+        try:
             self.crd_resource_handler.apply()
+        except ApiError as error:
+            if self._check_and_report_k8s_conflict(error) and force_conflicts:
+                # conflict detected when applying CRD resources
+                # re-apply CRD resources with forced conflict resolution
+                self.unit.status = MaintenanceStatus("Force applying CRD resources")
+                self.logger.warning("Apply CRD resources with forced changes against conflicts")
+                self.crd_resource_handler.apply(force=force_conflicts)
+            else:
+                raise GenericCharmRuntimeError("CRD resources creation failed") from error
+        try:
             self.configmap_resource_handler.apply()
-        except ApiError as e:
-            raise GenericCharmRuntimeError("Failed to create K8S resources") from e
+        except ApiError as error:
+            if self._check_and_report_k8s_conflict(error) and force_conflicts:
+                # conflict detected when applying ConfigMap resources
+                # re-apply ConfigMap resources with forced conflict resolution
+                self.unit.status = MaintenanceStatus("Force applying ConfigMap resources")
+                self.logger.warning("Apply ConfigMap with forced changes against conflicts")
+                self.configmap_resource_handler.apply(force=force_conflicts)
+            else:
+                raise GenericCharmRuntimeError("ConfigMap resources creation failed") from error
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
     def _on_install(self, _):
         """Installation only tasks."""
         # deploy K8S resources to speed up deployment
-        self._deploy_k8s_resources()
+        self._apply_k8s_resources()
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
@@ -315,7 +355,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_container_connection(self.container)
         except ErrorWithStatus as error:
-            self.model.unit = error.status
+            self.model.unit.status = error.status
             return
 
         # container is ready
@@ -324,6 +364,15 @@ class SeldonCoreOperator(CharmBase):
 
         # proceed with other actions
         self._on_event(event)
+
+    def _on_upgrade(self, _):
+        """Perform upgrade steps."""
+        # upload certs to container
+        if self.container.can_connect():
+            self._upload_certs_to_container()
+
+        # force conflict resolution in K8S resources update
+        self._on_event(_, force_conflicts=True)
 
     def _on_remove(self, _):
         """Remove all resources."""
@@ -338,9 +387,11 @@ class SeldonCoreOperator(CharmBase):
                 self.configmap_resource_handler.lightkube_client,
                 configmap_resources_manifests,
             )
-        except ApiError as err:
-            self.logger.error(f"Failed to delete K8S resources, with error: {err}")
-            raise err
+        except ApiError as error:
+            # do not log/report when resources were not found
+            if error.status.code != 404:
+                self.logger.error(f"Failed to delete K8S resources, with error: {error}")
+                raise error
         self.unit.status = MaintenanceStatus("K8S resources removed")
 
     def _gen_certs(self):
@@ -447,11 +498,16 @@ class SeldonCoreOperator(CharmBase):
             istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
 
-    def _on_event(self, event) -> None:
-        """Perform all required actions for the Charm."""
+    def _on_event(self, event, force_conflicts: bool = False) -> None:
+        """Perform all required actions for the Charm.
+
+        Args:
+            force_conflicts (bool): Should only be used when need to resolved conflicts on K8S
+                                    resources.
+        """
         try:
             self._check_leader()
-            self._deploy_k8s_resources()
+            self._apply_k8s_resources(force_conflicts=force_conflicts)
             self._update_layer()
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
