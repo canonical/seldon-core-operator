@@ -70,6 +70,10 @@ ordered-set==4.1.0
     #   deepdiff
 packaging==23.0
     # via pytest
+pkgutil-resolve-name==1.3.10
+    # via
+    #   -r ./requirements.txt
+    #   jsonschema
 pluggy==1.0.0
     # via pytest
 pytest==7.2.2
@@ -86,6 +90,7 @@ pyyaml==6.0
     #   -r ./requirements.txt
     #   lightkube
     #   ops
+
 rfc3986[idna2008]==1.5.0
     # via
     #   -r ./requirements.txt
