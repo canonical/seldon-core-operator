@@ -281,3 +281,47 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["data"]["names"] == ["proba"]
     assert response["data"]["tensor"]["shape"] == [2, 1]
     assert response["meta"] == {}
+
+
+@pytest.mark.abort_on_fail
+async def test_remove_with_resources_present(ops_test: OpsTest):
+    """Test remove with all resources deployed.
+
+    Verify that all deployed resources that need to be removed are removed.
+
+    """
+    # remove deployed charm and verify that it is removed
+    await ops_test.model.remove_application(app_name=APP_NAME, block_until_done=True)
+    assert APP_NAME not in ops_test.model.applications
+
+    # verify that all resources that were deployed are removed
+    lightkube_client = Client()
+
+    # verify all CRDs in namespace are removed
+    crd_list = lightkube_client.list(
+        CustomResourceDefinition,
+        labels=[("app.juju.is/created-by", "seldon-controller-manager")],
+        namespace=ops_test.model.name,
+    )
+    assert not list(crd_list)
+
+    # verify that ConfigMap is removed
+    # TO-DO: test all ConfigMaps with label app.juju.is/created-by=seldon-controller-manager
+    try:
+        _ = lightkube_client.get(
+            ConfigMap,
+            name="seldon-config",
+            namespace=ops_test.model.name,
+        )
+    except ApiError as error:
+        if error.status.code != 404:
+            # other error than Not Found
+            assert False
+
+    # verify that all related Services are removed
+    svc_list = lightkube_client.list(
+        Service,
+        labels=[("app.juju.is/created-by", "seldon-controller-manager")],
+        namespace=ops_test.model.name,
+    )
+    assert not list(svc_list)
