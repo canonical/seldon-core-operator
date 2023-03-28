@@ -55,6 +55,9 @@ async def test_upgrade(ops_test: OpsTest):
     charm_under_test = await ops_test.build_charm(".")
 
     # download and deploy stable version of the charm
+    await ops_test.model.deploy(
+        entity_url=APP_NAME, application_name=APP_NAME, channel="1.5/stable", trust=True
+    )
     stable_charm_resources = {"oci-image": "docker.io/seldonio/seldon-core-operator:1.14.0"}
     stable_charm = str(charm_under_test.parent) + "/seldon-core-stable.charm"
     juju_download_result, _, __ = await ops_test.juju(
