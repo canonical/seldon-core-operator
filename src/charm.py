@@ -276,7 +276,8 @@ class SeldonCoreOperator(CharmBase):
 
         Args:
             container: the named container in a unit to check.
-            event: the event that triggered the check. Will be deferred if the container is not ready.
+            event: the event that triggered the check.
+                Will be deferred if the container is not ready.
 
         Raises:
             ErrorWithStatus if the connection cannot be made.
