@@ -257,6 +257,8 @@ class SeldonCoreOperator(CharmBase):
 
     def _update_layer(self) -> None:
         """Update the Pebble configuration layer (if changed)."""
+        self._check_container_connection(self.container)
+
         current_layer = self.container.get_plan()
         new_layer = self._seldon_core_operator_layer
         if current_layer.services != new_layer.services:
