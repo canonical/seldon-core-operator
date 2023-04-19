@@ -77,9 +77,7 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
 
     # add Seldon/Istio relation
     await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
-    await ops_test.model.wait_for_idle(
-        status="active", raise_on_blocked=True, timeout=60 * 5
-    )
+    await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=60 * 5)
 
 
 @tenacity.retry(
