@@ -35,6 +35,9 @@ async def test_build_and_deploy(ops_test: OpsTest):
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     resources = {"oci-image": image_path}
 
+    # set default series for test model
+    await ops_test.juju("model-config", "default-series=focal")
+
     await ops_test.model.deploy(
         charm_under_test, resources=resources, application_name=APP_NAME, trust=True
     )
