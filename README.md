@@ -17,7 +17,7 @@ $ juju deploy seldon-core seldon-controller-manager
 
 ## Seldon ROCK images
 
-Charmed Seldon Core Operator relies on ROCK images. Thos images are defined in [Seldonio ROCKs repository](https://github.com/canonical/seldonio-rocks)
+Charmed Seldon Core Operator relies on ROCK images that are defined in [Seldonio ROCKs repository](https://github.com/canonical/seldonio-rocks)
 
 ## Looking for a fully supported platform for MLOps?
 
