@@ -281,6 +281,53 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["meta"] == {}
 
 
+async def test_seldon_server(ops_test: OpsTest, server):
+    """Test Seldon server scenario."""
+    # NOTE: This test is re-using deployment created in test_build_and_deploy()
+    namespace = ops_test.model_name
+    client = Client()
+
+    this_ns = client.get(res=Namespace, name=namespace)
+    this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
+    client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
+
+    seldon_deployment = create_namespaced_resource(
+        group="machinelearning.seldon.io",
+        version="v1",
+        kind="seldondeployment",
+        plural="seldondeployments",
+        verbs=None,
+    )
+
+    with open(f"examples/{server}") as f:
+        sdep = seldon_deployment(yaml.safe_load(f.read()))
+        client.create(sdep, namespace=namespace)
+
+    assert_available(client, seldon_deployment, "seldon-model", namespace)
+
+    service_name = "seldon-model-example-classifier"
+    service = client.get(Service, name=service_name, namespace=namespace)
+    service_ip = service.spec.clusterIP
+    service_port = next(p for p in service.spec.ports if p.name == "http").port
+
+    response = requests.post(
+        f"http://{service_ip}:{service_port}/predict",
+        json={
+            "data": {
+                "names": ["a", "b"],
+                "tensor": {"shape": [2, 2], "values": [0, 0, 1, 1]},
+            }
+        },
+    )
+    response.raise_for_status()
+
+    response = response.json()
+
+    assert response["data"]["names"] == ["proba"]
+    assert response["data"]["tensor"]["shape"] == [2, 1]
+    assert response["meta"] == {}
+
+
 @pytest.mark.abort_on_fail
 async def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.
