@@ -1,5 +1,6 @@
 aiohttp
 jinja2
+# 3.0 is not maintained. All bug fixes are landed in 2.9, 3.1 and 3.2
 juju<3.0
 pytest-operator
 requests
