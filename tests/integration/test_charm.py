@@ -280,6 +280,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["data"]["tensor"]["shape"] == [2, 1]
     assert response["meta"] == {}
 
+
 @pytest.mark.abort_on_fail
 async def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.
