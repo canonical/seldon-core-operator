@@ -1,4 +1,5 @@
-apiVersion: machinelearning.seldon.io/v1alpha2
+# based on https://docs.seldon.io/projects/seldon-core/en/latest/servers/sklearn.html
+apiVersion: machinelearning.seldon.io/v1
 kind: SeldonDeployment
 metadata:
   name: sklearn

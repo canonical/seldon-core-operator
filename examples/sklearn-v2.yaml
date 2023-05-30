@@ -1,15 +1,19 @@
-apiVersion: machinelearning.seldon.io/v1alpha2
+# based on https://docs.seldon.io/projects/seldon-core/en/latest/servers/sklearn.html
+apiVersion: machinelearning.seldon.io/v1
 kind: SeldonDeployment
 metadata:
   name: sklearn
 spec:
-  name: iris
-  protocol: v2
+  name: iris-predict
+  protocol: v2 # Activate the V2 protocol
   predictors:
   - graph:
       children: []
       implementation: SKLEARN_SERVER
       modelUri: gs://seldon-models/v1.17.0-dev/sklearn/iris
       name: classifier
+      parameters:
+        - name: method
+          type: STRING
+          value: predict
     name: default
-    replicas: 1

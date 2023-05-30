@@ -281,7 +281,58 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["meta"] == {}
 
 
-async def test_seldon_server(ops_test: OpsTest, server):
+@pytest.mark.parametrize(
+    # server_config - server configuration file
+    # url - model prediction URL
+    # req_data - data to put into request
+    # resp_data - data expected in response
+    "server_config, url, req_data, resp_data",
+    [
+        (
+            "sklearn.yaml",
+            "api/v1.0/predictions",
+            {"data": {"ndarray": [[1, 2, 3, 4]]}},
+            {
+                "data": {
+                    "names": ["t:0", "t:1", "t:2"],
+                    "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
+                },
+                "meta": {"requestPath": {"classifier": "seldonio/sklearnserver:1.15.0"}},
+            },
+        ),
+        (
+            "sklearn-v2.yaml",
+            "v2/models/classifier/infer",
+            {
+                "inputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 4],
+                        "datatype": "FP32",
+                        "data": [[1, 2, 3, 4]],
+                    },
+                ]
+            },
+            {
+                "model_name": "classifier",
+                "model_version": "v1",
+                "id": None,  # id needs to be reset in response
+                "parameters": {"content_type": None, "headers": None},
+                "outputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 1],
+                        "datatype": "INT64",
+                        "parameters": None,
+                        "data": [2],
+                    }
+                ],
+            },
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_seldon_server(ops_test: OpsTest, server_config, url, req_data, resp_data):
     """Test Seldon server scenario."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
     namespace = ops_test.model_name
@@ -299,33 +350,32 @@ async def test_seldon_server(ops_test: OpsTest, server):
         verbs=None,
     )
 
-    with open(f"examples/{server}") as f:
-        sdep = seldon_deployment(yaml.safe_load(f.read()))
+    with open(f"examples/{server_config}") as f:
+        deploy_yaml = yaml.safe_load(f.read())
+        model = deploy_yaml["metadata"]["name"]
+        predictor = deploy_yaml["spec"]["predictors"][0]["name"]
+        sdep = seldon_deployment(deploy_yaml)
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, seldon_deployment, "seldon-model", namespace)
+    assert_available(client, seldon_deployment, model, namespace)
 
-    service_name = "seldon-model-example-classifier"
+    service_name = f"{model}-{predictor}-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
     service_ip = service.spec.clusterIP
     service_port = next(p for p in service.spec.ports if p.name == "http").port
 
-    response = requests.post(
-        f"http://{service_ip}:{service_port}/predict",
-        json={
-            "data": {
-                "names": ["a", "b"],
-                "tensor": {"shape": [2, 2], "values": [0, 0, 1, 1]},
-            }
-        },
-    )
+    response = requests.post(f"http://{service_ip}:{service_port}/{url}", json=req_data)
     response.raise_for_status()
-
     response = response.json()
 
-    assert response["data"]["names"] == ["proba"]
-    assert response["data"]["tensor"]["shape"] == [2, 1]
-    assert response["meta"] == {}
+    # reset id in response, if present
+    if "id" in response.keys():
+        response["id"] = None
+
+    assert sorted(response.items()) == sorted(resp_data.items())
+
+    client.delete(seldon_deployment, name=model, namespace=namespace)
+    client.delete(Service, name=service_name, namespace=namespace)
 
 
 @pytest.mark.abort_on_fail
