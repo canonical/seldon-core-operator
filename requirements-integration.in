@@ -1,7 +1,7 @@
 aiohttp
 jinja2
 # Pinning to <3.0 due to compatibility with the 2.9 controller version and 3.0 not being maintained anymore
-juju<3.0
+juju<3.2
 pytest-operator
 requests
 -r requirements.txt
