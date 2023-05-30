@@ -132,7 +132,7 @@ async def check_alert_propagation(url, alert_name):
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
-    namespace = ops_test.model.name
+    namespace = ops_test.model_name
     client = Client()
 
     # setup Prometheus
@@ -396,7 +396,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     crd_list = lightkube_client.list(
         CustomResourceDefinition,
         labels=[("app.juju.is/created-by", "seldon-controller-manager")],
-        namespace=ops_test.model.name,
+        namespace=ops_test.model_name,
     )
     assert not list(crd_list)
 
@@ -406,7 +406,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
         _ = lightkube_client.get(
             ConfigMap,
             name="seldon-config",
-            namespace=ops_test.model.name,
+            namespace=ops_test.model_name,
         )
     except ApiError as error:
         if error.status.code != 404:
@@ -417,6 +417,6 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     svc_list = lightkube_client.list(
         Service,
         labels=[("app.juju.is/created-by", "seldon-controller-manager")],
-        namespace=ops_test.model.name,
+        namespace=ops_test.model_name,
     )
     assert not list(svc_list)

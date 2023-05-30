@@ -1,19 +1,23 @@
-# Seldon Core Operator
+# Charmed Seldon Core Operator
 
-[![Seldon Core Operator](https://charmhub.io/seldon-core/badge.svg)](https://charmhub.io/seldon-core)
+[![Charmed Seldon Core Operator](https://charmhub.io/seldon-core/badge.svg)](https://charmhub.io/seldon-core)
 
 ## Description
 
-The Seldon Core Charmed Operator for Juju enables fast and easy deployment of models and experiments at scale as an integral part of Charmed Kubeflow. Also it handles installation, scaling, and configuration.
+The Charmed Seldon Core Operator for Juju enables fast and easy deployment of models and experiments at scale as an integral part of Charmed Kubeflow. Also it handles installation, scaling, and configuration.
 
 ## Usage
 
-The Seldon Core Operator may be deployed using the Juju command line as
+The Charmed Seldon Core Operator may be deployed using the Juju command line as
 follows
 
 ```sh
 $ juju deploy seldon-core seldon-controller-manager
 ```
+
+## Seldon ROCK images
+
+Charmed Seldon Core Operator relies on ROCK images that are defined in [Seldonio ROCKs repository](https://github.com/canonical/seldonio-rocks)
 
 ## Looking for a fully supported platform for MLOps?
 
@@ -73,3 +77,4 @@ Canonical welcomes contributions to Charmed Kubeflow. Please check out our [cont
 
 ### Security
 Security issues in Charmed Kubeflow can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not file GitHub issues about security issues.
+
