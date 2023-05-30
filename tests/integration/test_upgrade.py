@@ -82,7 +82,7 @@ async def test_upgrade(ops_test: OpsTest):
         cluster_crd = lightkube_client.get(
             CustomResourceDefinition,
             name="seldondeployments.machinelearning.seldon.io",
-            namespace=ops_test.model.name,
+            namespace=ops_test.model_name,
         )
     except ApiError as error:
         logger.error(f"CRD not found {error}")
@@ -103,7 +103,7 @@ async def test_upgrade(ops_test: OpsTest):
         _ = lightkube_client.get(
             ConfigMap,
             name="seldon-config",
-            namespace=ops_test.model.name,
+            namespace=ops_test.model_name,
         )
     except ApiError as error:
         logger.error(f"ConfigMap not found {error}")
