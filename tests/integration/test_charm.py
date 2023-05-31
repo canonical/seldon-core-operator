@@ -82,7 +82,7 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
 
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(30),
+    stop=tenacity.stop_after_attempt(60),
     reraise=True,
 )
 def assert_available(client, resource_class, resource_name, namespace):
@@ -279,6 +279,107 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["data"]["names"] == ["proba"]
     assert response["data"]["tensor"]["shape"] == [2, 1]
     assert response["meta"] == {}
+
+
+@pytest.mark.parametrize(
+    # server_config - server configuration file
+    # url - model prediction URL
+    # req_data - data to put into request
+    # resp_data - data expected in response
+    "server_config, url, req_data, resp_data",
+    [
+        (
+            "sklearn.yaml",
+            "api/v1.0/predictions",
+            {"data": {"ndarray": [[1, 2, 3, 4]]}},
+            {
+                "data": {
+                    "names": ["t:0", "t:1", "t:2"],
+                    "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
+                },
+                "meta": {"requestPath": {"classifier": "seldonio/sklearnserver:1.15.0"}},
+            },
+        ),
+        (
+            "sklearn-v2.yaml",
+            "v2/models/classifier/infer",
+            {
+                "inputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 4],
+                        "datatype": "FP32",
+                        "data": [[1, 2, 3, 4]],
+                    },
+                ]
+            },
+            {
+                "model_name": "classifier",
+                "model_version": "v1",
+                "id": None,  # id needs to be reset in response
+                "parameters": {"content_type": None, "headers": None},
+                "outputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 1],
+                        "datatype": "INT64",
+                        "parameters": None,
+                        "data": [2],
+                    }
+                ],
+            },
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, req_data, resp_data):
+    """Test Seldon predictor server.
+
+    Workload deploys Seldon predictor servers defined in ConfigMap.
+    Each server is deployed and inference request is triggered, and response is evaluated.
+    """
+    # NOTE: This test is re-using deployment created in test_build_and_deploy()
+    namespace = ops_test.model_name
+    client = Client()
+
+    this_ns = client.get(res=Namespace, name=namespace)
+    this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
+    client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
+
+    seldon_deployment = create_namespaced_resource(
+        group="machinelearning.seldon.io",
+        version="v1",
+        kind="seldondeployment",
+        plural="seldondeployments",
+        verbs=None,
+    )
+
+    with open(f"examples/{server_config}") as f:
+        deploy_yaml = yaml.safe_load(f.read())
+        model = deploy_yaml["metadata"]["name"]
+        predictor = deploy_yaml["spec"]["predictors"][0]["name"]
+        sdep = seldon_deployment(deploy_yaml)
+        client.create(sdep, namespace=namespace)
+
+    assert_available(client, seldon_deployment, model, namespace)
+
+    service_name = f"{model}-{predictor}-classifier"
+    service = client.get(Service, name=service_name, namespace=namespace)
+    service_ip = service.spec.clusterIP
+    service_port = next(p for p in service.spec.ports if p.name == "http").port
+
+    response = requests.post(f"http://{service_ip}:{service_port}/{url}", json=req_data)
+    response.raise_for_status()
+    response = response.json()
+
+    # reset id in response, if present
+    if "id" in response.keys():
+        response["id"] = None
+
+    assert sorted(response.items()) == sorted(resp_data.items())
+
+    client.delete(seldon_deployment, name=model, namespace=namespace)
+    client.delete(Service, name=service_name, namespace=namespace)
 
 
 @pytest.mark.abort_on_fail

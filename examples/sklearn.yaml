@@ -1,0 +1,15 @@
+# based on https://docs.seldon.io/projects/seldon-core/en/latest/servers/sklearn.html
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: sklearn
+spec:
+  name: iris
+  predictors:
+  - graph:
+      children: []
+      implementation: SKLEARN_SERVER
+      modelUri: gs://seldon-models/v1.17.0-dev/sklearn/iris
+      name: classifier
+    name: default
+    replicas: 1
