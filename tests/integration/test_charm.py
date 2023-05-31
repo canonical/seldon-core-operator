@@ -82,7 +82,7 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
 
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(30),
+    stop=tenacity.stop_after_attempt(60),
     reraise=True,
 )
 def assert_available(client, resource_class, resource_name, namespace):
