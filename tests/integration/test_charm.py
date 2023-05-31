@@ -332,8 +332,12 @@ async def test_seldon_deployment(ops_test: OpsTest):
     ],
 )
 @pytest.mark.asyncio
-async def test_seldon_server(ops_test: OpsTest, server_config, url, req_data, resp_data):
-    """Test Seldon server scenario."""
+async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, req_data, resp_data):
+    """Test Seldon predictor server.
+
+    Workload deploys Seldon predictor servers defined in ConfigMap.
+    Each server is deployed and inference request is triggered, and response is evaluated.
+    """
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
     namespace = ops_test.model_name
     client = Client()
