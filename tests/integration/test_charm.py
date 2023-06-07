@@ -5,6 +5,7 @@
 """Integration tests for Seldon Core Operator/Charm."""
 
 import logging
+import subprocess
 from pathlib import Path
 
 import aiohttp
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = "seldon-controller-manager"
+SELDON_DEPLOYMENT = None
 
 
 @pytest.mark.abort_on_fail
@@ -129,6 +131,7 @@ async def check_alert_propagation(url, alert_name):
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
 
+@pytest.mark.asyncio
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
@@ -201,13 +204,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # simulate scenario where alert will fire
     # create SeldonDeployment
-    seldon_deployment = create_namespaced_resource(
-        group="machinelearning.seldon.io",
-        version="v1",
-        kind="seldondeployment",
-        plural="seldondeployments",
-        verbs=None,
-    )
+    seldon_deployment = create_seldon_deployment()
     with open("examples/serve-simple-v1.yaml") as f:
         sdep = seldon_deployment(yaml.safe_load(f.read()))
         sdep["metadata"]["name"] = "seldon-model-1"
@@ -215,7 +212,9 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     assert_available(client, seldon_deployment, "seldon-model-1", namespace)
 
     # remove deployment that was created by Seldon, reconcile alert will fire
-    client.delete(Deployment, name="seldon-model-1-example-0-classifier", namespace=namespace)
+    client.delete(
+        Deployment, name="seldon-model-1-example-0-classifier", namespace=namespace, grace_period=0
+    )
 
     # check Prometheus for propagated alerts
     await check_alert_propagation(rules_url, test_alert_name)
@@ -231,9 +230,35 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     assert seldon_reconcile_error_alert["state"] == "firing"
 
     # cleanup SeldonDeployment
-    client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace)
+    client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace, grace_period=0)
+
+    # wait for application to settle
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+    )
 
 
+def create_seldon_deployment():
+    """Create Seldon Deployment once.
+
+    If does not exist, create Seldon Deployment and store it in global.
+    Return Seldon Deployment.
+    """
+    global SELDON_DEPLOYMENT
+    if SELDON_DEPLOYMENT is None:
+        seldon_deployment = create_namespaced_resource(
+            group="machinelearning.seldon.io",
+            version="v1",
+            kind="seldondeployment",
+            plural="seldondeployments",
+            verbs=None,
+        )
+        SELDON_DEPLOYMENT = seldon_deployment
+
+    return SELDON_DEPLOYMENT
+
+
+@pytest.mark.asyncio
 async def test_seldon_deployment(ops_test: OpsTest):
     """Test Seldon Deployment scenario."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
@@ -244,14 +269,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    seldon_deployment = create_namespaced_resource(
-        group="machinelearning.seldon.io",
-        version="v1",
-        kind="seldondeployment",
-        plural="seldondeployments",
-        verbs=None,
-    )
-
+    seldon_deployment = create_seldon_deployment()
     with open("examples/serve-simple-v1.yaml") as f:
         sdep = seldon_deployment(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
@@ -279,6 +297,13 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["data"]["names"] == ["proba"]
     assert response["data"]["tensor"]["shape"] == [2, 1]
     assert response["meta"] == {}
+
+    client.delete(seldon_deployment, name="seldon-model", namespace=namespace, grace_period=0)
+
+    # wait for application to settle
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+    )
 
 
 @pytest.mark.parametrize(
@@ -346,24 +371,17 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    seldon_deployment = create_namespaced_resource(
-        group="machinelearning.seldon.io",
-        version="v1",
-        kind="seldondeployment",
-        plural="seldondeployments",
-        verbs=None,
-    )
-
+    seldon_deployment = create_seldon_deployment()
     with open(f"examples/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
-        model = deploy_yaml["metadata"]["name"]
+        ml_model = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
         sdep = seldon_deployment(deploy_yaml)
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, seldon_deployment, model, namespace)
+    assert_available(client, seldon_deployment, ml_model, namespace)
 
-    service_name = f"{model}-{predictor}-classifier"
+    service_name = f"{ml_model}-{predictor}-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
     service_ip = service.spec.clusterIP
     service_port = next(p for p in service.spec.ports if p.name == "http").port
@@ -378,20 +396,36 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
 
     assert sorted(response.items()) == sorted(resp_data.items())
 
-    client.delete(seldon_deployment, name=model, namespace=namespace)
-    client.delete(Service, name=service_name, namespace=namespace)
+    client.delete(seldon_deployment, name=ml_model, namespace=namespace, grace_period=0)
+
+    # wait for application to settle
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+    )
+
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
+    stop=tenacity.stop_after_attempt(60),
+    reraise=True,
+)
+async def assert_removed(ops_test: OpsTest):
+    """Remove application and verify it is removed."""
+    logger.info(f"Removing application {APP_NAME}")
+    # TO-DO: use this: await ops_test.run("juju", "remove-application", f"{APP_NAME}")
+    subprocess.run(["juju", "remove-application", f"{APP_NAME}"])
+    assert APP_NAME not in ops_test.model.applications
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.asyncio
 async def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.
 
     Verify that all deployed resources that need to be removed are removed.
-
     """
     # remove deployed charm and verify that it is removed
-    await ops_test.model.remove_application(app_name=APP_NAME, block_until_done=True)
-    assert APP_NAME not in ops_test.model.applications
+    await assert_removed(ops_test)
 
     # verify that all resources that were deployed are removed
     lightkube_client = Client()

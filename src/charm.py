@@ -25,7 +25,7 @@ from ops.charm import CharmBase
 from ops.framework import EventBase, StoredState
 from ops.main import main
 from ops.model import ActiveStatus, Container, MaintenanceStatus, WaitingStatus
-from ops.pebble import ChangeError, Layer
+from ops.pebble import ChangeError, Layer, ProtocolError
 
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
@@ -98,6 +98,7 @@ class SeldonCoreOperator(CharmBase):
         self.framework.observe(self.on.upgrade_charm, self._on_upgrade)
         self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.stop, self._on_stop)
 
         # Prometheus related config
         self.prometheus_provider = MetricsEndpointProvider(
@@ -371,6 +372,17 @@ class SeldonCoreOperator(CharmBase):
 
         # force conflict resolution in K8S resources update
         self._on_event(event, force_conflicts=True)
+
+    def _on_stop(self, _):
+        """Stop workload container."""
+        if self.container.can_connect():
+            self.unit.status = MaintenanceStatus("Stopping container")
+            try:
+                self.container.stop(self._container_name)
+            except ProtocolError as error:
+                self.logger.error(f"Failed to stop container, error: {error}")
+                raise error
+            self.unit.status = MaintenanceStatus("Requested container to stop")
 
     def _on_remove(self, _):
         """Remove all resources."""

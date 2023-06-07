@@ -5,6 +5,13 @@ metadata:
   name: sklearn
 spec:
   name: iris-predict
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
   protocol: v2 # Activate the V2 protocol
   predictors:
   - graph:
