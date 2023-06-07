@@ -22,7 +22,7 @@ from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
-from ops.framework import StoredState
+from ops.framework import EventBase, StoredState
 from ops.main import main
 from ops.model import ActiveStatus, Container, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
@@ -255,8 +255,10 @@ class SeldonCoreOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    def _update_layer(self) -> None:
+    def _update_layer(self, event: EventBase) -> None:
         """Update the Pebble configuration layer (if changed)."""
+        self._check_container_connection(self.container, event)
+
         current_layer = self.container.get_plan()
         new_layer = self._seldon_core_operator_layer
         if current_layer.services != new_layer.services:
@@ -268,29 +270,34 @@ class SeldonCoreOperator(CharmBase):
             except ChangeError as e:
                 raise GenericCharmRuntimeError("Failed to replan") from e
 
-    def _check_container_connection(self, container: Container) -> None:
+    @staticmethod
+    def _check_container_connection(container: Container, event: EventBase) -> None:
         """Check if connection can be made with container.
 
         Args:
             container: the named container in a unit to check.
+            event: the event that triggered the check.
+                Will be deferred if the container is not ready.
 
         Raises:
             ErrorWithStatus if the connection cannot be made.
         """
         if not container.can_connect():
+            event.defer()
             raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
 
-    def _upload_certs_to_container(self):
+    def _upload_certs_to_container(self, event: EventBase):
         """Upload generated certs to container."""
         try:
-            self._check_container_connection(self.container)
+            self._check_container_connection(self.container, event)
         except ErrorWithStatus as error:
             self.model.unit.status = error.status
-            return
+            return False
 
         self.container.push(CONTAINER_CERTS_DEST + "tls.key", self._stored.key, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "tls.crt", self._stored.cert, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "ca.crt", self._stored.ca, make_dirs=True)
+        return True
 
     def _check_and_report_k8s_conflict(self, error):
         """Return True if error status code is 409 (conflict), False otherwise."""
@@ -351,28 +358,19 @@ class SeldonCoreOperator(CharmBase):
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
-        # TODO: extract try/except to _check_container_connection()
-        try:
-            self._check_container_connection(self.container)
-        except ErrorWithStatus as error:
-            self.model.unit.status = error.status
+        if not self._upload_certs_to_container(event):
             return
-
-        # container is ready
-        # upload certs to container
-        self._upload_certs_to_container()
 
         # proceed with other actions
         self._on_event(event)
 
-    def _on_upgrade(self, _):
+    def _on_upgrade(self, event):
         """Perform upgrade steps."""
-        # upload certs to container
-        if self.container.can_connect():
-            self._upload_certs_to_container()
+        if not self._upload_certs_to_container(event):
+            return
 
         # force conflict resolution in K8S resources update
-        self._on_event(_, force_conflicts=True)
+        self._on_event(event, force_conflicts=True)
 
     def _on_remove(self, _):
         """Remove all resources."""
@@ -508,7 +506,7 @@ class SeldonCoreOperator(CharmBase):
         try:
             self._check_leader()
             self._apply_k8s_resources(force_conflicts=force_conflicts)
-            self._update_layer()
+            self._update_layer(event)
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.info(f"Failed to handle {event} with error: {str(err)}")
@@ -521,8 +519,5 @@ class SeldonCoreOperator(CharmBase):
         return [{"running-models": [{"targets": [p for p in self._stored.targets.values()]}]}]
 
 
-#
-# Start main
-#
 if __name__ == "__main__":
     main(SeldonCoreOperator)

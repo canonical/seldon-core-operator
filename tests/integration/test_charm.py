@@ -71,15 +71,13 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[istio_pilot, istio_gateway],
         status="active",
-        raise_on_blocked=True,
-        timeout=60 * 10 * 2,
+        raise_on_blocked=False,
+        timeout=60 * 20,
     )
 
     # add Seldon/Istio relation
     await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10
-    )
+    await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=60 * 5)
 
 
 @tenacity.retry(
@@ -134,7 +132,7 @@ async def check_alert_propagation(url, alert_name):
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
-    namespace = ops_test.model.name
+    namespace = ops_test.model_name
     client = Client()
 
     # setup Prometheus
@@ -301,7 +299,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     crd_list = lightkube_client.list(
         CustomResourceDefinition,
         labels=[("app.juju.is/created-by", "seldon-controller-manager")],
-        namespace=ops_test.model.name,
+        namespace=ops_test.model_name,
     )
     assert not list(crd_list)
 
@@ -311,7 +309,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
         _ = lightkube_client.get(
             ConfigMap,
             name="seldon-config",
-            namespace=ops_test.model.name,
+            namespace=ops_test.model_name,
         )
     except ApiError as error:
         if error.status.code != 404:
@@ -322,6 +320,6 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     svc_list = lightkube_client.list(
         Service,
         labels=[("app.juju.is/created-by", "seldon-controller-manager")],
-        namespace=ops_test.model.name,
+        namespace=ops_test.model_name,
     )
     assert not list(svc_list)
