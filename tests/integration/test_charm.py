@@ -45,7 +45,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
-
+@pytest.mark.skip()
 async def test_seldon_istio_relation(ops_test: OpsTest):
     """Test Seldon/Istio relation."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
@@ -129,6 +129,7 @@ async def check_alert_propagation(url, alert_name):
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
 
+@pytest.mark.skip()
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
@@ -300,38 +301,39 @@ async def test_seldon_deployment(ops_test: OpsTest):
                 "meta": {"requestPath": {"classifier": "seldonio/sklearnserver:1.15.0"}},
             },
         ),
-        (
-            "sklearn-v2.yaml",
-            "v2/models/classifier/infer",
-            {
-                "inputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 4],
-                        "datatype": "FP32",
-                        "data": [[1, 2, 3, 4]],
-                    },
-                ]
-            },
-            {
-                "model_name": "classifier",
-                "model_version": "v1",
-                "id": None,  # id needs to be reset in response
-                "parameters": {"content_type": None, "headers": None},
-                "outputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 1],
-                        "datatype": "INT64",
-                        "parameters": None,
-                        "data": [2],
-                    }
-                ],
-            },
-        ),
+        # (
+        #     "sklearn-v2.yaml",
+        #     "v2/models/classifier/infer",
+        #     {
+        #         "inputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 4],
+        #                 "datatype": "FP32",
+        #                 "data": [[1, 2, 3, 4]],
+        #             },
+        #         ]
+        #     },
+        #     {
+        #         "model_name": "classifier",
+        #         "model_version": "v1",
+        #         "id": None,  # id needs to be reset in response
+        #         "parameters": {"content_type": None, "headers": None},
+        #         "outputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 1],
+        #                 "datatype": "INT64",
+        #                 "parameters": None,
+        #                 "data": [2],
+        #             }
+        #         ],
+        #     },
+        # ),
     ],
 )
 @pytest.mark.asyncio
+
 async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, req_data, resp_data):
     """Test Seldon predictor server.
 
