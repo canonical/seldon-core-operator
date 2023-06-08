@@ -24,7 +24,13 @@ logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = "seldon-controller-manager"
-SELDON_DEPLOYMENT = None
+SELDON_DEPLOYMENT = create_namespaced_resource(
+    group="machinelearning.seldon.io",
+    version="v1",
+    kind="seldondeployment",
+    plural="seldondeployments",
+    verbs=None,
+)
 
 
 @pytest.mark.abort_on_fail
@@ -204,12 +210,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # simulate scenario where alert will fire
     # create SeldonDeployment
-    seldon_deployment = create_seldon_deployment()
     with open("examples/serve-simple-v1.yaml") as f:
-        sdep = seldon_deployment(yaml.safe_load(f.read()))
+        sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         sdep["metadata"]["name"] = "seldon-model-1"
         client.create(sdep, namespace=namespace)
-    assert_available(client, seldon_deployment, "seldon-model-1", namespace)
+    assert_available(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # remove deployment that was created by Seldon, reconcile alert will fire
     client.delete(
@@ -230,32 +235,12 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     assert seldon_reconcile_error_alert["state"] == "firing"
 
     # cleanup SeldonDeployment
-    client.delete(seldon_deployment, name="seldon-model-1", namespace=namespace, grace_period=0)
+    client.delete(SELDON_DEPLOYMENT, name="seldon-model-1", namespace=namespace, grace_period=0)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
     )
-
-
-def create_seldon_deployment():
-    """Create Seldon Deployment once.
-
-    If does not exist, create Seldon Deployment and store it in global.
-    Return Seldon Deployment.
-    """
-    global SELDON_DEPLOYMENT
-    if SELDON_DEPLOYMENT is None:
-        seldon_deployment = create_namespaced_resource(
-            group="machinelearning.seldon.io",
-            version="v1",
-            kind="seldondeployment",
-            plural="seldondeployments",
-            verbs=None,
-        )
-        SELDON_DEPLOYMENT = seldon_deployment
-
-    return SELDON_DEPLOYMENT
 
 
 @pytest.mark.asyncio
@@ -269,12 +254,11 @@ async def test_seldon_deployment(ops_test: OpsTest):
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    seldon_deployment = create_seldon_deployment()
     with open("examples/serve-simple-v1.yaml") as f:
-        sdep = seldon_deployment(yaml.safe_load(f.read()))
+        sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, seldon_deployment, "seldon-model", namespace)
+    assert_available(client, SELDON_DEPLOYMENT, "seldon-model", namespace)
 
     service_name = "seldon-model-example-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
@@ -298,7 +282,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["data"]["tensor"]["shape"] == [2, 1]
     assert response["meta"] == {}
 
-    client.delete(seldon_deployment, name="seldon-model", namespace=namespace, grace_period=0)
+    client.delete(SELDON_DEPLOYMENT, name="seldon-model", namespace=namespace, grace_period=0)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
@@ -371,15 +355,14 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    seldon_deployment = create_seldon_deployment()
     with open(f"examples/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
         ml_model = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
-        sdep = seldon_deployment(deploy_yaml)
+        sdep = SELDON_DEPLOYMENT(deploy_yaml)
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, seldon_deployment, ml_model, namespace)
+    assert_available(client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     service_name = f"{ml_model}-{predictor}-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
@@ -396,7 +379,7 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
 
     assert sorted(response.items()) == sorted(resp_data.items())
 
-    client.delete(seldon_deployment, name=ml_model, namespace=namespace, grace_period=0)
+    client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
