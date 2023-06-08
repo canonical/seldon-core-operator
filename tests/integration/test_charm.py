@@ -240,7 +240,9 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # wait for application to settle
     # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
-    sleep(60)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+    )
 
 
 @pytest.mark.asyncio
@@ -286,7 +288,9 @@ async def test_seldon_deployment(ops_test: OpsTest):
 
     # wait for application to settle
     # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
-    sleep(60)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+    )
 
 
 @pytest.mark.parametrize(
@@ -382,7 +386,9 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
 
     # wait for application to settle
     # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
-    sleep(60)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+    )
 
 
 @tenacity.retry(
