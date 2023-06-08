@@ -284,11 +284,6 @@ async def test_seldon_deployment(ops_test: OpsTest):
 
     client.delete(SELDON_DEPLOYMENT, name="seldon-model", namespace=namespace, grace_period=0)
 
-    # wait for application to settle
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
-    )
-
 
 @pytest.mark.parametrize(
     # server_config - server configuration file
@@ -380,11 +375,6 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     assert sorted(response.items()) == sorted(resp_data.items())
 
     client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
-
-    # wait for application to settle
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
-    )
 
 
 @tenacity.retry(
