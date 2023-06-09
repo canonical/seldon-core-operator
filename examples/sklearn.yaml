@@ -5,6 +5,13 @@ metadata:
   name: sklearn
 spec:
   name: iris
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
   predictors:
   - graph:
       children: []

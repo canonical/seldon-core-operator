@@ -4,6 +4,13 @@ metadata:
   name: seldon-model
 spec:
   name: test-deployment
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
   predictors:
   - componentSpecs:
     - spec:
