@@ -306,7 +306,10 @@ class SeldonCoreOperator(CharmBase):
             return True
         return False
 
-    def _apply_k8s_resources(self, force_conflicts: bool = False) -> None:
+    # TODO: force_conflicts=True to work around issue
+    #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+    #  a better solution.
+    def _apply_k8s_resources(self, force_conflicts: bool = True) -> None:
         """Apply K8S resources.
 
         Args:
@@ -354,7 +357,10 @@ class SeldonCoreOperator(CharmBase):
     def _on_install(self, _):
         """Installation only tasks."""
         # deploy K8S resources to speed up deployment
-        self._apply_k8s_resources()
+        # TODO: force_conflicts=True to work around issue
+        #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+        #  a better solution.
+        self._apply_k8s_resources(force_conflicts=True)
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
@@ -362,7 +368,10 @@ class SeldonCoreOperator(CharmBase):
             return
 
         # proceed with other actions
-        self._on_event(event)
+        # TODO: force_conflicts=True to work around issue
+        #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+        #  a better solution.
+        self._on_event(event, force_conflicts=True)
 
     def _on_upgrade(self, event):
         """Perform upgrade steps."""
@@ -496,7 +505,10 @@ class SeldonCoreOperator(CharmBase):
             istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
 
-    def _on_event(self, event, force_conflicts: bool = False) -> None:
+    # TODO: force_conflicts=True to work around issue
+    #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+    #  a better solution.
+    def _on_event(self, event, force_conflicts: bool = True) -> None:
         """Perform all required actions for the Charm.
 
         Args:
