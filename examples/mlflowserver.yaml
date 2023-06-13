@@ -1,0 +1,22 @@
+# https://docs.seldon.io/projects/seldon-core/en/latest/servers/mlflow.html
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: mlflow
+spec:
+  name: wines
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
+  predictors:
+    - graph:
+        children: []
+        implementation: MLFLOW_SERVER
+        modelUri: gs://seldon-models/mlflow/elasticnet_wine_1.8.0
+        name: classifier
+      name: default
+      replicas: 1

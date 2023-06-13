@@ -6,7 +6,6 @@
 
 import logging
 import subprocess
-import time
 from pathlib import Path
 
 import aiohttp
@@ -237,12 +236,32 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # cleanup SeldonDeployment
     client.delete(SELDON_DEPLOYMENT, name="seldon-model-1", namespace=namespace, grace_period=0)
+    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
     # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
+
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
+    stop=tenacity.stop_after_attempt(60),
+    reraise=True,
+)
+def assert_deleted(client, resource_class, resource_name, namespace):
+    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
+    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
+    deleted = False
+    try:
+        dep = client.get(resource_class, resource_name, namespace=namespace)
+    except ApiError as error:
+        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
+        if error.status.code == 404:
+            deleted = True
+
+    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 @pytest.mark.asyncio
@@ -285,11 +304,12 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["meta"] == {}
 
     client.delete(SELDON_DEPLOYMENT, name="seldon-model", namespace=namespace, grace_period=0)
+    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
     # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
 
 
@@ -309,6 +329,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
                     "names": ["t:0", "t:1", "t:2"],
                     "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
                 },
+                # TO-DO: this might need to be adjusted when testing with rocks, i.e. read it from configmap
                 "meta": {"requestPath": {"classifier": "seldonio/sklearnserver:1.15.0"}},
             },
         ),
@@ -341,6 +362,89 @@ async def test_seldon_deployment(ops_test: OpsTest):
                 ],
             },
         ),
+        (
+            "xgboost.yaml",
+            "api/v1.0/predictions",
+            {"data": {"ndarray": [[1.0, 2.0, 5.0, 6.0]]}},
+            {
+                "data": {
+                    "names": [],
+                    "ndarray": [2.0],
+                },
+                "meta": {"requestPath": {"classifier": "seldonio/xgboostserver:1.15.0"}},
+            },
+        ),
+        (
+            "xgboost-v2.yaml",
+            "v2/models/iris/infer",
+            {
+                "inputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 4],
+                        "datatype": "FP32",
+                        "data": [[1, 2, 3, 4]],
+                    },
+                ]
+            },
+            {
+                "model_name": "iris",
+                "model_version": "v0.1.0",
+                "id": None,  # id needs to be reset in response
+                "parameters": {"content_type": None, "headers": None},
+                "outputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 1],
+                        "datatype": "FP32",
+                        "parameters": None,
+                        "data": [2.0],
+                    }
+                ],
+            },
+        ),
+        (
+            "mlflowserver.yaml",
+            "api/v1.0/predictions",
+            {"data": {"ndarray": [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]]}},
+            {
+                "data": {
+                    "names": [],
+                    "ndarray": [5.275558760255382],
+                },
+                "meta": {"requestPath": {"classifier": "seldonio/mlflowserver:1.15.0"}},
+            },
+        ),
+        # Disable test for mlflowserver V2 due to failure in model in test container
+        # (
+        #     "mlflowserver-v2.yaml",
+        #     "v2/models/iris/infer",
+        #     {
+        #         "inputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 4],
+        #                 "datatype": "FP32",
+        #                 "data": [[1, 2, 3, 4]],
+        #             },
+        #         ]
+        #     },
+        #     {
+        #         "model_name": "iris",
+        #         "model_version": "v0.1.0",
+        #         "id": None,  # id needs to be reset in response
+        #         "parameters": {"content_type": None, "headers": None},
+        #         "outputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 1],
+        #                 "datatype": "FP32",
+        #                 "parameters": None,
+        #                 "data": [2.0],
+        #             }
+        #         ],
+        #     },
+        # ),
     ],
 )
 @pytest.mark.asyncio
@@ -383,11 +487,12 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     assert sorted(response.items()) == sorted(resp_data.items())
 
     client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
+    assert_deleted(client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # wait for application to settle
     # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
 
 
@@ -396,12 +501,14 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     stop=tenacity.stop_after_attempt(60),
     reraise=True,
 )
-async def assert_removed(ops_test: OpsTest):
+async def assert_application_removed(ops_test: OpsTest):
     """Remove application and verify it is removed."""
-    logger.info(f"Removing application {APP_NAME}")
+    logger.info(f"Removing application {APP_NAME} from model {ops_test.model_name}")
     # TO-DO: use this: await ops_test.run("juju", "remove-application", f"{APP_NAME}")
-    subprocess.run(["juju", "remove-application", f"{APP_NAME}"])
-    assert APP_NAME not in ops_test.model.applications
+    subprocess.check_output(
+        ["juju", "remove-application", "-m", f"{ops_test.model_name}", f"{APP_NAME}"]
+    )
+    assert APP_NAME not in ops_test.model.applications, f"Waited too long for {APP_NAME} removal!"
 
 
 @pytest.mark.abort_on_fail
@@ -412,7 +519,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     Verify that all deployed resources that need to be removed are removed.
     """
     # remove deployed charm and verify that it is removed
-    await assert_removed(ops_test)
+    await assert_application_removed(ops_test)
 
     # verify that all resources that were deployed are removed
     lightkube_client = Client()
