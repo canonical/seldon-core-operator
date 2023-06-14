@@ -21,6 +21,7 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
+from lightkube.resources.core_v1 import ConfigMap
 from ops.charm import CharmBase
 from ops.framework import EventBase, StoredState
 from ops.main import main
@@ -405,6 +406,13 @@ class SeldonCoreOperator(CharmBase):
             delete_many(
                 self.configmap_resource_handler.lightkube_client,
                 configmap_resources_manifests,
+            )
+            # remove ConfigMap deployed by workload
+            self.configmap_resource_handler.lightkube_client.delete(
+                ConfigMap,
+                name="a33bd623.machinelearning.seldon.io",
+                namespace=self._namespace,
+                grace_period=0,
             )
         except ApiError as error:
             # do not log/report when resources were not found

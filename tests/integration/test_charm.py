@@ -17,7 +17,7 @@ from lightkube import ApiError, Client
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.apiextensions_v1 import CustomResourceDefinition
 from lightkube.resources.apps_v1 import Deployment
-from lightkube.resources.core_v1 import ConfigMap, Namespace, Service
+from lightkube.resources.core_v1 import ConfigMap, Namespace, Pod, Service
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -109,6 +109,24 @@ def assert_available(client, resource_class, resource_name, namespace):
         )
 
     assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
+    stop=tenacity.stop_after_attempt(60),
+    reraise=True,
+)
+def assert_deleted(client, resource_class, resource_name, namespace):
+    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
+    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
+    deleted = False
+    try:
+        dep = client.get(resource_class, resource_name, namespace=namespace)
+    except ApiError as error:
+        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
+        if error.status.code == 404:
+            deleted = True
+
+    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 async def fetch_url(url):
@@ -243,25 +261,6 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
-
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_deleted(client, resource_class, resource_name, namespace):
-    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
-    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
-    deleted = False
-    try:
-        dep = client.get(resource_class, resource_name, namespace=namespace)
-    except ApiError as error:
-        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
-        if error.status.code == 404:
-            deleted = True
-
-    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 @pytest.mark.asyncio
@@ -496,34 +495,24 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     )
 
 
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-async def assert_application_removed(ops_test: OpsTest):
-    """Remove application and verify it is removed."""
-    logger.info(f"Removing application {APP_NAME} from model {ops_test.model_name}")
-    # TO-DO: use this: await ops_test.run("juju", "remove-application", f"{APP_NAME}")
-    subprocess.check_output(
-        ["juju", "remove-application", "-m", f"{ops_test.model_name}", f"{APP_NAME}"]
-    )
-    assert APP_NAME not in ops_test.model.applications, f"Waited too long for {APP_NAME} removal!"
-
-
 @pytest.mark.abort_on_fail
-@pytest.mark.asyncio
-async def test_remove_with_resources_present(ops_test: OpsTest):
+def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.
 
     Verify that all deployed resources that need to be removed are removed.
     """
-    # remove deployed charm and verify that it is removed
-    await assert_application_removed(ops_test)
-
-    # verify that all resources that were deployed are removed
     lightkube_client = Client()
 
+    # remove deployed charm and verify that it is removed
+    # TO-DO: use this: await ops_test.run("juju", "remove-application", f"{APP_NAME}")
+    subprocess.check_output(
+            f"juju remove-application -m {ops_test.model_name} {APP_NAME}",
+            shell=True,
+            stderr=subprocess.STDOUT,
+        )
+    assert_deleted(lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name)
+
+    # verify that all resources that were deployed are removed
     # verify all CRDs in namespace are removed
     crd_list = lightkube_client.list(
         CustomResourceDefinition,
