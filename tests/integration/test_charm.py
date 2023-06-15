@@ -259,7 +259,6 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
@@ -308,7 +307,6 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
@@ -523,7 +521,6 @@ async def test_seldon_predictor_server(
     assert_deleted(client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # wait for application to settle
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
@@ -538,14 +535,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     lightkube_client = Client()
 
     # remove deployed charm and verify that it is removed
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
-    # TO-DO: use this: await ops_test.run("juju", "remove-application", f"{APP_NAME}")
-    # TO-DO: use this: assert APP_NAME in ops_test.model.applications
-    subprocess.check_output(
-        f"juju remove-application -m {ops_test.model_name} {APP_NAME}",
-        shell=True,
-        stderr=subprocess.STDOUT,
-    )
+    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
     assert_deleted(lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name)
 
     # verify that all resources that were deployed are removed
