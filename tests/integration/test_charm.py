@@ -4,9 +4,9 @@
 
 """Integration tests for Seldon Core Operator/Charm."""
 
+import json
 import logging
 import subprocess
-import time
 from pathlib import Path
 
 import aiohttp
@@ -14,11 +14,11 @@ import pytest
 import requests
 import tenacity
 import yaml
-from lightkube import ApiError, Client
+from lightkube import ApiError, Client, codecs
 from lightkube.generic_resource import create_namespaced_resource
 from lightkube.resources.apiextensions_v1 import CustomResourceDefinition
 from lightkube.resources.apps_v1 import Deployment
-from lightkube.resources.core_v1 import ConfigMap, Namespace, Service
+from lightkube.resources.core_v1 import ConfigMap, Namespace, Pod, Service
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -110,6 +110,25 @@ def assert_available(client, resource_class, resource_name, namespace):
         )
 
     assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
+
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
+    stop=tenacity.stop_after_attempt(60),
+    reraise=True,
+)
+def assert_deleted(client, resource_class, resource_name, namespace):
+    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
+    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
+    deleted = False
+    try:
+        dep = client.get(resource_class, resource_name, namespace=namespace)
+    except ApiError as error:
+        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
+        if error.status.code == 404:
+            deleted = True
+
+    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 async def fetch_url(url):
@@ -237,11 +256,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # cleanup SeldonDeployment
     client.delete(SELDON_DEPLOYMENT, name="seldon-model-1", namespace=namespace, grace_period=0)
+    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
 
 
@@ -285,22 +304,24 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["meta"] == {}
 
     client.delete(SELDON_DEPLOYMENT, name="seldon-model", namespace=namespace, grace_period=0)
+    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
 
 
 @pytest.mark.parametrize(
+    # server_name - name of predictor server (should match configmap)
     # server_config - server configuration file
     # url - model prediction URL
     # req_data - data to put into request
     # resp_data - data expected in response
-    "server_config, url, req_data, resp_data",
+    "server_name, server_config, url, req_data, resp_data",
     [
         (
+            "SKLEARN_SERVER",
             "sklearn.yaml",
             "api/v1.0/predictions",
             {"data": {"ndarray": [[1, 2, 3, 4]]}},
@@ -309,10 +330,12 @@ async def test_seldon_deployment(ops_test: OpsTest):
                     "names": ["t:0", "t:1", "t:2"],
                     "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
                 },
-                "meta": {"requestPath": {"classifier": "seldonio/sklearnserver:1.15.0"}},
+                # classifier will be replaced according to configmap
+                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
             },
         ),
         (
+            "SKLEARN_SERVER",
             "sklearn-v2.yaml",
             "v2/models/classifier/infer",
             {
@@ -341,10 +364,99 @@ async def test_seldon_deployment(ops_test: OpsTest):
                 ],
             },
         ),
+        (
+            "XGBOOST_SERVER",
+            "xgboost.yaml",
+            "api/v1.0/predictions",
+            {"data": {"ndarray": [[1.0, 2.0, 5.0, 6.0]]}},
+            {
+                "data": {
+                    "names": [],
+                    "ndarray": [2.0],
+                },
+                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
+            },
+        ),
+        (
+            "XGBOOST_SERVER",
+            "xgboost-v2.yaml",
+            "v2/models/iris/infer",
+            {
+                "inputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 4],
+                        "datatype": "FP32",
+                        "data": [[1, 2, 3, 4]],
+                    },
+                ]
+            },
+            {
+                "model_name": "iris",
+                "model_version": "v0.1.0",
+                "id": None,  # id needs to be reset in response
+                "parameters": {"content_type": None, "headers": None},
+                "outputs": [
+                    {
+                        "name": "predict",
+                        "shape": [1, 1],
+                        "datatype": "FP32",
+                        "parameters": None,
+                        "data": [2.0],
+                    }
+                ],
+            },
+        ),
+        (
+            "MLFLOW_SERVER",
+            "mlflowserver.yaml",
+            "api/v1.0/predictions",
+            {"data": {"ndarray": [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]]}},
+            {
+                "data": {
+                    "names": [],
+                    "ndarray": [5.275558760255382],
+                },
+                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
+            },
+        ),
+        # Disable test for mlflowserver V2 due to failure in model in test container
+        # (
+        #     "MLFLOW_SERVER",
+        #     "mlflowserver-v2.yaml",
+        #     "v2/models/iris/infer",
+        #     {
+        #         "inputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 4],
+        #                 "datatype": "FP32",
+        #                 "data": [[1, 2, 3, 4]],
+        #             },
+        #         ]
+        #     },
+        #     {
+        #         "model_name": "iris",
+        #         "model_version": "v0.1.0",
+        #         "id": None,  # id needs to be reset in response
+        #         "parameters": {"content_type": None, "headers": None},
+        #         "outputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 1],
+        #                 "datatype": "FP32",
+        #                 "parameters": None,
+        #                 "data": [2.0],
+        #             }
+        #         ],
+        #     },
+        # ),
     ],
 )
 @pytest.mark.asyncio
-async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, req_data, resp_data):
+async def test_seldon_predictor_server(
+    ops_test: OpsTest, server_name, server_config, url, req_data, resp_data
+):
     """Test Seldon predictor server.
 
     Workload deploys Seldon predictor servers defined in ConfigMap.
@@ -358,20 +470,26 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
+    # retrieve predictor server information and create Seldon Depoloyment
     with open(f"examples/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
         ml_model = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
+        protocol = "seldon"  # default protocol
+        if "protocol" in deploy_yaml["spec"]:
+            protocol = deploy_yaml["spec"]["protocol"]
         sdep = SELDON_DEPLOYMENT(deploy_yaml)
         client.create(sdep, namespace=namespace)
 
     assert_available(client, SELDON_DEPLOYMENT, ml_model, namespace)
 
+    # obtain prediction service endpoint
     service_name = f"{ml_model}-{predictor}-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
     service_ip = service.spec.clusterIP
     service_port = next(p for p in service.spec.ports if p.name == "http").port
 
+    # post prediction request
     response = requests.post(f"http://{service_ip}:{service_port}/{url}", json=req_data)
     response.raise_for_status()
     response = response.json()
@@ -380,43 +498,47 @@ async def test_seldon_predictor_server(ops_test: OpsTest, server_config, url, re
     if "id" in response.keys():
         response["id"] = None
 
+    # for 'seldon' protocol update test data with correct predictor server image
+    if protocol == "seldon":
+        # retrieve predictor server image from configmap to implicitly verify that it matches
+        # deployed predictor server image
+        configmap = client.get(
+            ConfigMap,
+            name="seldon-config",
+            namespace=ops_test.model_name,
+        )
+        configmap_yaml = yaml.safe_load(codecs.dump_all_yaml([configmap]))
+        servers = json.loads(configmap_yaml["data"]["predictor_servers"])
+        server_image = servers[server_name]["protocols"][protocol]["image"]
+        server_version = servers[server_name]["protocols"][protocol]["defaultImageVersion"]
+        resp_data["meta"]["requestPath"]["classifier"] = f"{server_image}:{server_version}"
+
+    # verify prediction response
     assert sorted(response.items()) == sorted(resp_data.items())
 
+    # remove Seldon Deployment
     client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
+    assert_deleted(client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # wait for application to settle
-    # verify if needed when https://github.com/juju/python-libjuju/issues/877 is resolved.
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60, idle_period=30
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
 
 
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-async def assert_removed(ops_test: OpsTest):
-    """Remove application and verify it is removed."""
-    logger.info(f"Removing application {APP_NAME}")
-    # TO-DO: use this: await ops_test.run("juju", "remove-application", f"{APP_NAME}")
-    subprocess.run(["juju", "remove-application", f"{APP_NAME}"])
-    assert APP_NAME not in ops_test.model.applications
-
-
 @pytest.mark.abort_on_fail
-@pytest.mark.asyncio
 async def test_remove_with_resources_present(ops_test: OpsTest):
     """Test remove with all resources deployed.
 
     Verify that all deployed resources that need to be removed are removed.
     """
-    # remove deployed charm and verify that it is removed
-    await assert_removed(ops_test)
-
-    # verify that all resources that were deployed are removed
     lightkube_client = Client()
 
+    # remove deployed charm and verify that it is removed
+    await ops_test.model.remove_application(APP_NAME, block_until_done=True)
+    assert_deleted(lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name)
+
+    # verify that all resources that were deployed are removed
     # verify all CRDs in namespace are removed
     crd_list = lightkube_client.list(
         CustomResourceDefinition,
@@ -425,12 +547,22 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
     )
     assert not list(crd_list)
 
-    # verify that ConfigMap is removed
-    # TO-DO: test all ConfigMaps with label app.juju.is/created-by=seldon-controller-manager
+    # verify that all ConfigMaps are removed
     try:
         _ = lightkube_client.get(
             ConfigMap,
             name="seldon-config",
+            namespace=ops_test.model_name,
+        )
+    except ApiError as error:
+        if error.status.code != 404:
+            # other error than Not Found
+            assert False
+
+    try:
+        _ = lightkube_client.get(
+            ConfigMap,
+            name="a33bd623.machinelearning.seldon.io",
             namespace=ops_test.model_name,
         )
     except ApiError as error:
