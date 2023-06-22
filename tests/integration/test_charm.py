@@ -230,7 +230,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # simulate scenario where alert will fire
     # create SeldonDeployment
-    with open("tests/data/serve-simple-v1.yaml") as f:
+    with open("tests/assets/crs/serve-simple-v1.yaml") as f:
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         sdep["metadata"]["name"] = "seldon-model-1"
         client.create(sdep, namespace=namespace)
@@ -275,7 +275,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    with open("tests/data/serve-simple-v1.yaml") as f:
+    with open("tests/assets/crs/serve-simple-v1.yaml") as f:
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
@@ -488,7 +488,7 @@ async def test_seldon_predictor_server(
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
     # retrieve predictor server information and create Seldon Depoloyment
-    with open(f"tests/data/{server_config}") as f:
+    with open(f"tests/assets/crs/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
         ml_model = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
@@ -503,7 +503,7 @@ async def test_seldon_predictor_server(
     # - otherwise use it as JSON object
     if isinstance(request_data, str):
         # response test data contains file with JSON data
-        with open(f"tests/data/{request_data}") as f:
+        with open(f"tests/assets/data/{request_data}") as f:
             request_data = json.load(f)
 
     # prepare test response data:
@@ -511,7 +511,7 @@ async def test_seldon_predictor_server(
     # - otherwise use it as JSON object
     if isinstance(response_test_data, str):
         # response test data contains file with JSON data
-        with open(f"tests/data/{response_test_data}") as f:
+        with open(f"tests/assets/data/{response_test_data}") as f:
             response_test_data = json.load(f)
 
     # wait for SeldonDeployment to become available
