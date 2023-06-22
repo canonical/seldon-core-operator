@@ -88,6 +88,16 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
     await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=60 * 5)
 
+    # cleanup istio deployment
+    await ops_test.juju(
+        "remove-relation", f"{APP_NAME}:gateway-info", f"{istio_pilot}:gateway-info"
+    )
+    await ops_test.model.remove_application(istio_gateway, block_until_done=True)
+    await ops_test.model.remove_application(istio_pilot, block_until_done=True)
+    client = Client()
+    assert_deleted(client, Pod, "istio-ingressgateway-0", ops_test.model_name)
+    assert_deleted(client, Pod, "istio-pilot-0", ops_test.model_name)
+
 
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
@@ -257,6 +267,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     # cleanup SeldonDeployment
     client.delete(SELDON_DEPLOYMENT, name="seldon-model-1", namespace=namespace, grace_period=0)
     assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+
+    # cleanup Prometheus deployment
+    await ops_test.juju("remove-relation", f"{APP_NAME}", f"{prometheus}")
+    await ops_test.model.remove_application(prometheus, block_until_done=True)
+    assert_deleted(client, Pod, "prometheus-k8s-0", ops_test.model_name)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
