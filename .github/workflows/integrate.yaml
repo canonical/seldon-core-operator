@@ -59,13 +59,8 @@ jobs:
         channel: 1.24/stable
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-
     - name: Run integration tests
-      run: |
-        juju add-model testing
-        tox -vve integration -- --model testing
+      run: tox -vve integration -- --model testing
 
     # On failure, capture debugging resources
     - name: Get all
