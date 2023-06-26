@@ -13,6 +13,7 @@ import aiohttp
 import pytest
 import requests
 import tenacity
+import utils
 import yaml
 from lightkube import ApiError, Client, codecs
 from lightkube.generic_resource import create_namespaced_resource
@@ -32,47 +33,6 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     plural="seldondeployments",
     verbs=None,
 )
-
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_available(client, resource_class, resource_name, namespace):
-    """Test for available status. Retries multiple times to allow deployment to be created."""
-    # NOTE: This test is re-using deployment created in test_build_and_deploy()
-
-    dep = client.get(resource_class, resource_name, namespace=namespace)
-    state = dep.get("status", {}).get("state")
-
-    resource_class_kind = resource_class.__name__
-    if state == "Available":
-        logger.info(f"{resource_class_kind}/{resource_name} status == {state}")
-    else:
-        logger.info(
-            f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
-        )
-
-    assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_deleted(client, resource_class, resource_name, namespace):
-    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
-    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
-    deleted = False
-    try:
-        dep = client.get(resource_class, resource_name, namespace=namespace)
-    except ApiError as error:
-        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
-        if error.status.code == 404:
-            deleted = True
-
-    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 @pytest.mark.abort_on_fail
@@ -299,7 +259,7 @@ async def test_seldon_predictor_server(
             response_test_data = json.load(f)
 
     # wait for SeldonDeployment to become available
-    assert_available(client, SELDON_DEPLOYMENT, ml_model, namespace)
+    utils.assert_available(logger, client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # obtain prediction service endpoint
     service_name = f"{ml_model}-{predictor}-classifier"
@@ -338,7 +298,7 @@ async def test_seldon_predictor_server(
 
     # remove Seldon Deployment
     client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
-    assert_deleted(client, SELDON_DEPLOYMENT, ml_model, namespace)
+    utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(

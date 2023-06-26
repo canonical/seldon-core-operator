@@ -60,10 +60,7 @@ jobs:
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
     - name: Run integration tests
-      run: tox -vve integration -- --keep-models
-
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
+      run: tox -vve integration -- --model testing
 
     # On failure, capture debugging resources
     - name: Get all

@@ -13,6 +13,7 @@ import aiohttp
 import pytest
 import requests
 import tenacity
+import utils
 import yaml
 from lightkube import ApiError, Client, codecs
 from lightkube.generic_resource import create_namespaced_resource
@@ -87,48 +88,6 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     # add Seldon/Istio relation
     await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
     await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=60 * 5)
-
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_available(client, resource_class, resource_name, namespace):
-    """Test for available status. Retries multiple times to allow deployment to be created."""
-    # NOTE: This test is re-using deployment created in test_build_and_deploy()
-
-    dep = client.get(resource_class, resource_name, namespace=namespace)
-    state = dep.get("status", {}).get("state")
-
-    resource_class_kind = resource_class.__name__
-    if state == "Available":
-        logger.info(f"{resource_class_kind}/{resource_name} status == {state}")
-    else:
-        logger.info(
-            f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
-        )
-
-    assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
-
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_deleted(client, resource_class, resource_name, namespace):
-    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
-    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
-    deleted = False
-    try:
-        dep = client.get(resource_class, resource_name, namespace=namespace)
-    except ApiError as error:
-        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
-        if error.status.code == 404:
-            deleted = True
-
-    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 async def fetch_url(url):
@@ -234,7 +193,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         sdep["metadata"]["name"] = "seldon-model-1"
         client.create(sdep, namespace=namespace)
-    assert_available(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+    utils.assert_available(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # remove deployment that was created by Seldon, reconcile alert will fire
     client.delete(
@@ -256,11 +215,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # cleanup SeldonDeployment
     client.delete(SELDON_DEPLOYMENT, name="seldon-model-1", namespace=namespace, grace_period=0)
-    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+    utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # cleanup Prometheus deployment
     await ops_test.model.remove_application(prometheus, block_until_done=True)
-    assert_deleted(client, Pod, "prometheus-k8s-0", ops_test.model_name)
+    utils.assert_deleted(logger, client, Pod, "prometheus-k8s-0", ops_test.model_name)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
@@ -283,7 +242,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, SELDON_DEPLOYMENT, "seldon-model", namespace)
+    utils.assert_available(logger, client, SELDON_DEPLOYMENT, "seldon-model", namespace)
 
     service_name = "seldon-model-example-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
@@ -308,7 +267,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["meta"] == {}
 
     client.delete(SELDON_DEPLOYMENT, name="seldon-model", namespace=namespace, grace_period=0)
-    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+    utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
@@ -326,7 +285,9 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
 
     # remove deployed charm and verify that it is removed
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
-    assert_deleted(lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name)
+    utils.assert_deleted(
+        logger, lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name
+    )
 
     # verify that all resources that were deployed are removed
     # verify all CRDs in namespace are removed
