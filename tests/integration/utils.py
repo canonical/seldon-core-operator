@@ -25,7 +25,9 @@ def assert_available(logger, client, resource_class, resource_name, namespace):
             f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
         )
 
-    assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
+    assert (
+        state == "Available" and state != "Failed"
+    ), f"Waited too long for {resource_class_kind}/{resource_name}!"
 
 
 @tenacity.retry(
