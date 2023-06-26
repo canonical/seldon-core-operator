@@ -62,6 +62,9 @@ jobs:
     - name: Run integration tests
       run: tox -ve integration
 
+    - name: Run workload integration tests
+      run: tox -ve workload-integration
+
     # On failure, capture debugging resources
     - name: Get all
       run: kubectl get all -A
