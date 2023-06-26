@@ -9,7 +9,7 @@ from lightkube import ApiError
 
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(120),
+    stop=tenacity.stop_after_attempt(80),
     reraise=True,
 )
 def assert_available(logger, client, resource_class, resource_name, namespace):
@@ -30,7 +30,7 @@ def assert_available(logger, client, resource_class, resource_name, namespace):
 
 @tenacity.retry(
     wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(120),
+    stop=tenacity.stop_after_attempt(80),
     reraise=True,
 )
 def assert_deleted(logger, client, resource_class, resource_name, namespace):
