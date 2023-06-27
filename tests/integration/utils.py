@@ -22,7 +22,9 @@ def assert_available(logger, client, resource_class, resource_name, namespace):
         logger.info(f"{resource_class_kind}/{resource_name} status == {state}")
     else:
         if state == "Failed":
-            logger.info("....")
+            logger.info(
+                f"Deployment of f{resource_class_kind}/{resource_name} failed, status = {state}"
+            )
         else:
             logger.info(
                 f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"

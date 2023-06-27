@@ -9,9 +9,11 @@ spec:
     requests:
       memory: "500Mi"
       cpu: "500m"
+      ephemeral-storage: "2G"
     limits:
       memory: "1G"
       cpu: "500m"
+      ephemeral-storage: "2G"
   predictors:
     - graph:
         children: []
