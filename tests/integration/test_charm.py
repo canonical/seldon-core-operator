@@ -13,6 +13,7 @@ import aiohttp
 import pytest
 import requests
 import tenacity
+import utils
 import yaml
 from lightkube import ApiError, Client, codecs
 from lightkube.generic_resource import create_namespaced_resource
@@ -87,48 +88,6 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     # add Seldon/Istio relation
     await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
     await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=60 * 5)
-
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_available(client, resource_class, resource_name, namespace):
-    """Test for available status. Retries multiple times to allow deployment to be created."""
-    # NOTE: This test is re-using deployment created in test_build_and_deploy()
-
-    dep = client.get(resource_class, resource_name, namespace=namespace)
-    state = dep.get("status", {}).get("state")
-
-    resource_class_kind = resource_class.__name__
-    if state == "Available":
-        logger.info(f"{resource_class_kind}/{resource_name} status == {state}")
-    else:
-        logger.info(
-            f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
-        )
-
-    assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
-
-
-@tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(60),
-    reraise=True,
-)
-def assert_deleted(client, resource_class, resource_name, namespace):
-    """Test for deleted resource. Retries multiple times to allow deployment to be deleted."""
-    logger.info(f"Waiting for {resource_class}/{resource_name} to be deleted.")
-    deleted = False
-    try:
-        dep = client.get(resource_class, resource_name, namespace=namespace)
-    except ApiError as error:
-        logger.info(f"Not found {resource_class}/{resource_name}. Status {error.status.code} ")
-        if error.status.code == 404:
-            deleted = True
-
-    assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
 
 
 async def fetch_url(url):
@@ -230,11 +189,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # simulate scenario where alert will fire
     # create SeldonDeployment
-    with open("examples/serve-simple-v1.yaml") as f:
+    with open("tests/assets/crs/serve-simple-v1.yaml") as f:
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         sdep["metadata"]["name"] = "seldon-model-1"
         client.create(sdep, namespace=namespace)
-    assert_available(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+    utils.assert_available(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # remove deployment that was created by Seldon, reconcile alert will fire
     client.delete(
@@ -256,7 +215,11 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # cleanup SeldonDeployment
     client.delete(SELDON_DEPLOYMENT, name="seldon-model-1", namespace=namespace, grace_period=0)
-    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+    utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
+
+    # cleanup Prometheus deployment
+    await ops_test.model.remove_application(prometheus, block_until_done=True)
+    utils.assert_deleted(logger, client, Pod, "prometheus-k8s-0", ops_test.model_name)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
@@ -275,11 +238,11 @@ async def test_seldon_deployment(ops_test: OpsTest):
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    with open("examples/serve-simple-v1.yaml") as f:
+    with open("tests/assets/crs/serve-simple-v1.yaml") as f:
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
-    assert_available(client, SELDON_DEPLOYMENT, "seldon-model", namespace)
+    utils.assert_available(logger, client, SELDON_DEPLOYMENT, "seldon-model", namespace)
 
     service_name = "seldon-model-example-classifier"
     service = client.get(Service, name=service_name, namespace=namespace)
@@ -304,221 +267,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     assert response["meta"] == {}
 
     client.delete(SELDON_DEPLOYMENT, name="seldon-model", namespace=namespace, grace_period=0)
-    assert_deleted(client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
-
-    # wait for application to settle
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
-    )
-
-
-@pytest.mark.parametrize(
-    # server_name - name of predictor server (should match configmap)
-    # server_config - server configuration file
-    # url - model prediction URL
-    # req_data - data to put into request
-    # resp_data - data expected in response
-    "server_name, server_config, url, req_data, resp_data",
-    [
-        (
-            "SKLEARN_SERVER",
-            "sklearn.yaml",
-            "api/v1.0/predictions",
-            {"data": {"ndarray": [[1, 2, 3, 4]]}},
-            {
-                "data": {
-                    "names": ["t:0", "t:1", "t:2"],
-                    "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
-                },
-                # classifier will be replaced according to configmap
-                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
-            },
-        ),
-        (
-            "SKLEARN_SERVER",
-            "sklearn-v2.yaml",
-            "v2/models/classifier/infer",
-            {
-                "inputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 4],
-                        "datatype": "FP32",
-                        "data": [[1, 2, 3, 4]],
-                    },
-                ]
-            },
-            {
-                "model_name": "classifier",
-                "model_version": "v1",
-                "id": None,  # id needs to be reset in response
-                "parameters": {"content_type": None, "headers": None},
-                "outputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 1],
-                        "datatype": "INT64",
-                        "parameters": None,
-                        "data": [2],
-                    }
-                ],
-            },
-        ),
-        (
-            "XGBOOST_SERVER",
-            "xgboost.yaml",
-            "api/v1.0/predictions",
-            {"data": {"ndarray": [[1.0, 2.0, 5.0, 6.0]]}},
-            {
-                "data": {
-                    "names": [],
-                    "ndarray": [2.0],
-                },
-                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
-            },
-        ),
-        (
-            "XGBOOST_SERVER",
-            "xgboost-v2.yaml",
-            "v2/models/iris/infer",
-            {
-                "inputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 4],
-                        "datatype": "FP32",
-                        "data": [[1, 2, 3, 4]],
-                    },
-                ]
-            },
-            {
-                "model_name": "iris",
-                "model_version": "v0.1.0",
-                "id": None,  # id needs to be reset in response
-                "parameters": {"content_type": None, "headers": None},
-                "outputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 1],
-                        "datatype": "FP32",
-                        "parameters": None,
-                        "data": [2.0],
-                    }
-                ],
-            },
-        ),
-        (
-            "MLFLOW_SERVER",
-            "mlflowserver.yaml",
-            "api/v1.0/predictions",
-            {"data": {"ndarray": [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]]}},
-            {
-                "data": {
-                    "names": [],
-                    "ndarray": [5.275558760255382],
-                },
-                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
-            },
-        ),
-        # Disable test for mlflowserver V2 due to failure in model in test container
-        # (
-        #     "MLFLOW_SERVER",
-        #     "mlflowserver-v2.yaml",
-        #     "v2/models/iris/infer",
-        #     {
-        #         "inputs": [
-        #             {
-        #                 "name": "predict",
-        #                 "shape": [1, 4],
-        #                 "datatype": "FP32",
-        #                 "data": [[1, 2, 3, 4]],
-        #             },
-        #         ]
-        #     },
-        #     {
-        #         "model_name": "iris",
-        #         "model_version": "v0.1.0",
-        #         "id": None,  # id needs to be reset in response
-        #         "parameters": {"content_type": None, "headers": None},
-        #         "outputs": [
-        #             {
-        #                 "name": "predict",
-        #                 "shape": [1, 1],
-        #                 "datatype": "FP32",
-        #                 "parameters": None,
-        #                 "data": [2.0],
-        #             }
-        #         ],
-        #     },
-        # ),
-    ],
-)
-@pytest.mark.asyncio
-async def test_seldon_predictor_server(
-    ops_test: OpsTest, server_name, server_config, url, req_data, resp_data
-):
-    """Test Seldon predictor server.
-
-    Workload deploys Seldon predictor servers defined in ConfigMap.
-    Each server is deployed and inference request is triggered, and response is evaluated.
-    """
-    # NOTE: This test is re-using deployment created in test_build_and_deploy()
-    namespace = ops_test.model_name
-    client = Client()
-
-    this_ns = client.get(res=Namespace, name=namespace)
-    this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
-    client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
-
-    # retrieve predictor server information and create Seldon Depoloyment
-    with open(f"examples/{server_config}") as f:
-        deploy_yaml = yaml.safe_load(f.read())
-        ml_model = deploy_yaml["metadata"]["name"]
-        predictor = deploy_yaml["spec"]["predictors"][0]["name"]
-        protocol = "seldon"  # default protocol
-        if "protocol" in deploy_yaml["spec"]:
-            protocol = deploy_yaml["spec"]["protocol"]
-        sdep = SELDON_DEPLOYMENT(deploy_yaml)
-        client.create(sdep, namespace=namespace)
-
-    assert_available(client, SELDON_DEPLOYMENT, ml_model, namespace)
-
-    # obtain prediction service endpoint
-    service_name = f"{ml_model}-{predictor}-classifier"
-    service = client.get(Service, name=service_name, namespace=namespace)
-    service_ip = service.spec.clusterIP
-    service_port = next(p for p in service.spec.ports if p.name == "http").port
-
-    # post prediction request
-    response = requests.post(f"http://{service_ip}:{service_port}/{url}", json=req_data)
-    response.raise_for_status()
-    response = response.json()
-
-    # reset id in response, if present
-    if "id" in response.keys():
-        response["id"] = None
-
-    # for 'seldon' protocol update test data with correct predictor server image
-    if protocol == "seldon":
-        # retrieve predictor server image from configmap to implicitly verify that it matches
-        # deployed predictor server image
-        configmap = client.get(
-            ConfigMap,
-            name="seldon-config",
-            namespace=ops_test.model_name,
-        )
-        configmap_yaml = yaml.safe_load(codecs.dump_all_yaml([configmap]))
-        servers = json.loads(configmap_yaml["data"]["predictor_servers"])
-        server_image = servers[server_name]["protocols"][protocol]["image"]
-        server_version = servers[server_name]["protocols"][protocol]["defaultImageVersion"]
-        resp_data["meta"]["requestPath"]["classifier"] = f"{server_image}:{server_version}"
-
-    # verify prediction response
-    assert sorted(response.items()) == sorted(resp_data.items())
-
-    # remove Seldon Deployment
-    client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
-    assert_deleted(client, SELDON_DEPLOYMENT, ml_model, namespace)
+    utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
@@ -536,7 +285,9 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
 
     # remove deployed charm and verify that it is removed
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
-    assert_deleted(lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name)
+    utils.assert_deleted(
+        logger, lightkube_client, Pod, "seldon-controller-manager-0", ops_test.model_name
+    )
 
     # verify that all resources that were deployed are removed
     # verify all CRDs in namespace are removed

@@ -7,11 +7,13 @@ spec:
   name: wines
   resources:
     requests:
-      memory: "64Mi"
+      memory: "500Mi"
       cpu: "500m"
+      ephemeral-storage: "2G"
     limits:
-      memory: "128Mi"
+      memory: "1G"
       cpu: "500m"
+      ephemeral-storage: "2G"
   predictors:
     - graph:
         children: []
