@@ -65,10 +65,6 @@ jobs:
     - name: Run workload integration tests
       run: tox -ve workload-integration -- --model testing
 
-    - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
-      timeout-minutes: 60
-
     # On failure, capture debugging resources
     - name: Get all
       run: kubectl get all -A
