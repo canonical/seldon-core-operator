@@ -21,9 +21,12 @@ def assert_available(logger, client, resource_class, resource_name, namespace):
     if state == "Available":
         logger.info(f"{resource_class_kind}/{resource_name} status == {state}")
     else:
-        logger.info(
-            f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
-        )
+        if state == "Failed":
+            logger.info("....")
+        else:
+            logger.info(
+                f"{resource_class_kind}/{resource_name} status == {state} (waiting for 'Available')"
+            )
 
     assert state == "Available", f"Waited too long for {resource_class_kind}/{resource_name}!"
 
