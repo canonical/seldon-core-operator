@@ -103,7 +103,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
                         "name": "predict",
                         "shape": [1, 1],
                         "datatype": "INT64",
-                        "parameters": {"content_type": "np" },
+                        "parameters": {"content_type": "np"},
                         "data": [2],
                     }
                 ],
