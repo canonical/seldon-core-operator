@@ -96,8 +96,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
             {
                 "model_name": "classifier",
                 "model_version": "v1",
-                "id": None,  # id needs to be reset in response
-                "parameters": {},
+                "id": "None",  # id needs to be reset in response
+                "parameters": {"content_type": None, "headers": None},
                 "outputs": [
                     {
                         "name": "predict",
@@ -140,7 +140,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
             {
                 "model_name": "iris",
                 "model_version": "v0.1.0",
-                "id": None,  # id needs to be reset in response
+                "id": "None",  # id needs to be reset in response
                 "parameters": {"content_type": None, "headers": None},
                 "outputs": [
                     {
@@ -167,37 +167,13 @@ async def test_build_and_deploy(ops_test: OpsTest):
                 "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
             },
         ),
-        # Disable test for mlflowserver V2 due to failure in model in test container
-        # (
-        #     "MLFLOW_SERVER",
-        #     "mlflowserver-v2.yaml",
-        #     "v2/models/iris/infer",
-        #     {
-        #         "inputs": [
-        #             {
-        #                 "name": "predict",
-        #                 "shape": [1, 4],
-        #                 "datatype": "FP32",
-        #                 "data": [[1, 2, 3, 4]],
-        #             },
-        #         ]
-        #     },
-        #     {
-        #         "model_name": "iris",
-        #         "model_version": "v0.1.0",
-        #         "id": None,  # id needs to be reset in response
-        #         "parameters": {"content_type": None, "headers": None},
-        #         "outputs": [
-        #             {
-        #                 "name": "predict",
-        #                 "shape": [1, 1],
-        #                 "datatype": "FP32",
-        #                 "parameters": None,
-        #                 "data": [2.0],
-        #             }
-        #         ],
-        #     },
-        # ),
+        (
+            "MLFLOW_SERVER",
+            "mlflowserver-v2.yaml",
+            "v2/models/classifier/infer",
+            "mlflowserver-request-data.json",
+            "mlflowserver-response-data.json",
+        ),
         (
             "TENSORFLOW_SERVER",
             "tensorflow-serving.yaml",
@@ -243,7 +219,7 @@ async def test_seldon_predictor_server(
         client.create(sdep, namespace=namespace)
 
     # prepare request data:
-    # - if it is string, load it from file specified in by that string
+    # - if it is string, load it from file specified by that string
     # - otherwise use it as JSON object
     if isinstance(request_data, str):
         # response test data contains file with JSON data
@@ -251,7 +227,7 @@ async def test_seldon_predictor_server(
             request_data = json.load(f)
 
     # prepare test response data:
-    # - if it is string, load it from file specified in by that string
+    # - if it is string, load it from file specified by that string
     # - otherwise use it as JSON object
     if isinstance(response_test_data, str):
         # response test data contains file with JSON data
@@ -274,7 +250,7 @@ async def test_seldon_predictor_server(
 
     # reset id in response, if present
     if "id" in response.keys():
-        response["id"] = None
+        response["id"] = "None"
 
     # for 'seldon' protocol update test data with correct predictor server image
     if protocol == "seldon":
