@@ -188,6 +188,37 @@ async def test_build_and_deploy(ops_test: OpsTest):
             {"instances": [1.0, 2.0, 5.0]},
             {"predictions": [2.5, 3, 4.5]},
         ),
+        (
+            "HUGGINGFACE_SERVER",
+            "huggingface.yaml",
+            "v2/models/classifier/infer",
+            {
+                "inputs": [
+                    {
+                        "name": "args",
+                        "shape": [1],
+                        "datatype": "BYTES",
+                        "data": ["this is a test"],
+                    }
+                ],
+            },
+            {
+                "model_name": "classifier",
+                "model_version": "v1",
+                "id": "None",
+                "parameters": {},
+                "outputs": [
+                    {
+                        "name": "output",
+                        "shape": [1, 1],
+                        "datatype": "BYTES",
+                        "parameters": {"content_type": "str"},
+                        # 'data' needs to be reset because GPT returns different results every time
+                        "data": "None",
+                    }
+                ],
+            },
+        ),
     ],
 )
 @pytest.mark.asyncio
@@ -251,6 +282,10 @@ async def test_seldon_predictor_server(
     # reset id in response, if present
     if "id" in response.keys():
         response["id"] = "None"
+
+    # reset data for HUGGINGFACE_SERVER because GPT inference returns different data every time
+    if server_name == "HUGGINGFACE_SERVER":
+        response["outputs"][0]["data"] = "None"
 
     # for 'seldon' protocol update test data with correct predictor server image
     if protocol == "seldon":
