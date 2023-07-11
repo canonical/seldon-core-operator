@@ -97,7 +97,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
                 "model_name": "classifier",
                 "model_version": "v1",
                 "id": None,  # id needs to be reset in response
-                "parameters": {"content_type": None, "headers": None},
+                "parameters": {},
                 "outputs": [
                     {
                         "name": "predict",
