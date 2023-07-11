@@ -147,7 +147,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
                         "name": "predict",
                         "shape": [1, 1],
                         "datatype": "FP32",
-                        "parameters":  {"content_type": "np"},
+                        "parameters": {"content_type": "np"},
                         "data": [2.0],
                     }
                 ],
