@@ -8,7 +8,7 @@ STATIC_IMAGE_LIST=(
 docker.io/seldonio/engine:1.12.0
 )
 # dynamic list
-git checkout origin/track/1.15
+git checkout main
 IMAGE_LIST=()
 IMAGE_LIST+=($(find $REPO -type f -name metadata.yaml -exec yq '.resources | to_entries | .[] | .value | ."upstream-source"' {} \;))
 IMAGE_LIST+=($(yq '.options.executor-container-image-and-version.default' config.yaml))
@@ -18,6 +18,7 @@ IMAGE_LIST+=($(yq '.options | ."executor-container-image-and-version" | .default
 IMAGE_LIST+=($(yq e ".data.storageInitializer" src/templates/configmap.yaml.j2 | jq -r 'select((.image)) | "\(.image)"'))
 IMAGE_LIST+=($(yq e ".data.explainer" src/templates/configmap.yaml.j2 | jq -r 'select((.image)) | "\(.image)"'))
 IMAGE_LIST+=($(yq e ".data.explainer" src/templates/configmap.yaml.j2 | jq -r 'select((.image_v2)) | "\(.image_v2)"'))
+
 
 printf "%s\n" "${STATIC_IMAGE_LIST[@]}"
 printf "%s\n" "${IMAGE_LIST[@]}"
