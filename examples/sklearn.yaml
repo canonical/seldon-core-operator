@@ -1,9 +1,10 @@
+# based on https://docs.seldon.io/projects/seldon-core/en/latest/servers/sklearn.html
 apiVersion: machinelearning.seldon.io/v1
 kind: SeldonDeployment
 metadata:
-  name: seldon-model
+  name: sklearn
 spec:
-  name: test-deployment
+  name: iris
   resources:
     requests:
       memory: "64Mi"
@@ -12,16 +13,10 @@ spec:
       memory: "128Mi"
       cpu: "250m"
   predictors:
-  - componentSpecs:
-    - spec:
-        containers:
-        - image: seldonio/mock_classifier_rest:1.3
-          name: classifier
-    graph:
+  - graph:
       children: []
-      endpoint:
-        type: REST
+      implementation: SKLEARN_SERVER
+      modelUri: gs://seldon-models/v1.17.0-dev/sklearn/iris
       name: classifier
-      type: MODEL
-    name: example
+    name: default
     replicas: 1

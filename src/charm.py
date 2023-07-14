@@ -16,20 +16,16 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.istio_pilot.v0.istio_gateway_info import GatewayRelationError, GatewayRequirer
-from charms.observability_libs.v0.metrics_endpoint_discovery import (
-    MetricsEndpointChangeCharmEvents,
-    MetricsEndpointObserver,
-)
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
 from lightkube.generic_resource import load_in_cluster_generic_resources
 from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
-from ops.framework import StoredState
+from ops.framework import EventBase, StoredState
 from ops.main import main
 from ops.model import ActiveStatus, Container, MaintenanceStatus, WaitingStatus
-from ops.pebble import ChangeError, Layer
+from ops.pebble import ChangeError, Layer, ProtocolError
 
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
@@ -50,7 +46,6 @@ class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator."""
 
     _stored = StoredState()
-    on = MetricsEndpointChangeCharmEvents()
 
     def __init__(self, *args):
         """Initialize charm and setup the container."""
@@ -94,16 +89,16 @@ class SeldonCoreOperator(CharmBase):
         )
 
         # setup events to be handled by main event handler
-        self.framework.observe(self.on.upgrade_charm, self._on_event)
         self.framework.observe(self.on.config_changed, self._on_event)
-
         for rel in self.model.relations.keys():
             self.framework.observe(self.on[rel].relation_changed, self._on_event)
 
         # setup events to be handled by specific event handlers
         self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade)
         self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
+        self.framework.observe(self.on.stop, self._on_stop)
 
         # Prometheus related config
         self.prometheus_provider = MetricsEndpointProvider(
@@ -122,14 +117,6 @@ class SeldonCoreOperator(CharmBase):
         self.dashboard_provider = GrafanaDashboardProvider(
             charm=self,
             relation_name="grafana-dashboard",
-        )
-
-        self.metrics_server_observer = MetricsEndpointObserver(
-            self, {"seldon-deployment-id": None}
-        )
-        self.framework.observe(
-            self.on.metrics_endpoint_change,
-            self._metrics_endpoint_change,
         )
 
     @property
@@ -269,8 +256,10 @@ class SeldonCoreOperator(CharmBase):
             self.logger.info("Not a leader, skipping setup")
             raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
-    def _update_layer(self) -> None:
+    def _update_layer(self, event: EventBase) -> None:
         """Update the Pebble configuration layer (if changed)."""
+        self._check_container_connection(self.container, event)
+
         current_layer = self.container.get_plan()
         new_layer = self._seldon_core_operator_layer
         if current_layer.services != new_layer.services:
@@ -282,61 +271,127 @@ class SeldonCoreOperator(CharmBase):
             except ChangeError as e:
                 raise GenericCharmRuntimeError("Failed to replan") from e
 
-    def _check_container_connection(self, container: Container) -> None:
+    @staticmethod
+    def _check_container_connection(container: Container, event: EventBase) -> None:
         """Check if connection can be made with container.
 
         Args:
             container: the named container in a unit to check.
+            event: the event that triggered the check.
+                Will be deferred if the container is not ready.
 
         Raises:
             ErrorWithStatus if the connection cannot be made.
         """
         if not container.can_connect():
+            event.defer()
             raise ErrorWithStatus("Pod startup is not complete", MaintenanceStatus)
 
-    def _upload_certs_to_container(self):
+    def _upload_certs_to_container(self, event: EventBase):
         """Upload generated certs to container."""
         try:
-            self._check_container_connection(self.container)
+            self._check_container_connection(self.container, event)
         except ErrorWithStatus as error:
-            self.model.unit = error.status
-            return
+            self.model.unit.status = error.status
+            return False
 
         self.container.push(CONTAINER_CERTS_DEST + "tls.key", self._stored.key, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "tls.crt", self._stored.cert, make_dirs=True)
         self.container.push(CONTAINER_CERTS_DEST + "ca.crt", self._stored.ca, make_dirs=True)
+        return True
 
-    def _deploy_k8s_resources(self) -> None:
-        """Deploys K8S resources."""
+    def _check_and_report_k8s_conflict(self, error):
+        """Return True if error status code is 409 (conflict), False otherwise."""
+        if error.status.code == 409:
+            self.logger.warning(f"Encountered a conflict: {error}")
+            return True
+        return False
+
+    # TODO: force_conflicts=True to work around issue
+    #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+    #  a better solution.
+    def _apply_k8s_resources(self, force_conflicts: bool = True) -> None:
+        """Apply K8S resources.
+
+        Args:
+            force_conflicts (bool): *(optional)* Will "force" apply requests causing conflicting
+                                    fields to change ownership to the field manager used in this
+                                    charm.
+                                    NOTE: This will only be used if initial regular apply() fails.
+        """
+        self.unit.status = MaintenanceStatus("Creating K8S resources")
         try:
-            self.unit.status = MaintenanceStatus("Creating K8S resources")
             self.k8s_resource_handler.apply()
+        except ApiError as error:
+            if self._check_and_report_k8s_conflict(error) and force_conflicts:
+                # conflict detected when applying K8S resources
+                # re-apply K8S resources with forced conflict resolution
+                self.unit.status = MaintenanceStatus("Force applying K8S resources")
+                self.logger.warning("Apply K8S resources with forced changes against conflicts")
+                self.k8s_resource_handler.apply(force=force_conflicts)
+            else:
+                raise GenericCharmRuntimeError("K8S resources creation failed") from error
+        try:
             self.crd_resource_handler.apply()
+        except ApiError as error:
+            if self._check_and_report_k8s_conflict(error) and force_conflicts:
+                # conflict detected when applying CRD resources
+                # re-apply CRD resources with forced conflict resolution
+                self.unit.status = MaintenanceStatus("Force applying CRD resources")
+                self.logger.warning("Apply CRD resources with forced changes against conflicts")
+                self.crd_resource_handler.apply(force=force_conflicts)
+            else:
+                raise GenericCharmRuntimeError("CRD resources creation failed") from error
+        try:
             self.configmap_resource_handler.apply()
-        except ApiError as e:
-            raise GenericCharmRuntimeError("Failed to create K8S resources") from e
+        except ApiError as error:
+            if self._check_and_report_k8s_conflict(error) and force_conflicts:
+                # conflict detected when applying ConfigMap resources
+                # re-apply ConfigMap resources with forced conflict resolution
+                self.unit.status = MaintenanceStatus("Force applying ConfigMap resources")
+                self.logger.warning("Apply ConfigMap with forced changes against conflicts")
+                self.configmap_resource_handler.apply(force=force_conflicts)
+            else:
+                raise GenericCharmRuntimeError("ConfigMap resources creation failed") from error
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
     def _on_install(self, _):
         """Installation only tasks."""
         # deploy K8S resources to speed up deployment
-        self._deploy_k8s_resources()
+        # TODO: force_conflicts=True to work around issue
+        #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+        #  a better solution.
+        self._apply_k8s_resources(force_conflicts=True)
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
-        # TODO: extract try/except to _check_container_connection()
-        try:
-            self._check_container_connection(self.container)
-        except ErrorWithStatus as error:
-            self.model.unit = error.status
+        if not self._upload_certs_to_container(event):
             return
 
-        # container is ready
-        # upload certs to container
-        self._upload_certs_to_container()
-
         # proceed with other actions
-        self._on_event(event)
+        # TODO: force_conflicts=True to work around issue
+        #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+        #  a better solution.
+        self._on_event(event, force_conflicts=True)
+
+    def _on_upgrade(self, event):
+        """Perform upgrade steps."""
+        if not self._upload_certs_to_container(event):
+            return
+
+        # force conflict resolution in K8S resources update
+        self._on_event(event, force_conflicts=True)
+
+    def _on_stop(self, _):
+        """Stop workload container."""
+        if self.container.can_connect():
+            self.unit.status = MaintenanceStatus("Stopping container")
+            try:
+                self.container.stop(self._container_name)
+            except ProtocolError as error:
+                self.logger.error(f"Failed to stop container, error: {error}")
+                raise error
+            self.unit.status = MaintenanceStatus("Requested container to stop")
 
     def _on_remove(self, _):
         """Remove all resources."""
@@ -351,9 +406,11 @@ class SeldonCoreOperator(CharmBase):
                 self.configmap_resource_handler.lightkube_client,
                 configmap_resources_manifests,
             )
-        except ApiError as err:
-            self.logger.error(f"Failed to delete K8S resources, with error: {err}")
-            raise err
+        except ApiError as error:
+            # do not log/report when resources were not found
+            if error.status.code != 404:
+                self.logger.error(f"Failed to delete K8S resources, with error: {error}")
+                raise error
         self.unit.status = MaintenanceStatus("K8S resources removed")
 
     def _gen_certs(self):
@@ -448,14 +505,6 @@ class SeldonCoreOperator(CharmBase):
 
         return ret_certs
 
-    def _metrics_endpoint_change(self, event):
-        k = f"{event.discovered['namespace']}-{event.discovered['name']}"
-        if event.discovered["change"] == "DELETED" and self._stored.targets.get(k, ""):
-            del self._stored.targets[k]
-        else:
-            self._stored.targets[k] = event.discovered["targets"]
-        self.prometheus_provider.set_scrape_job_spec()
-
     def _get_istio_gateway(self):
         """Parse 'gateway' relation and return Istio gateway definition in appropriate format."""
         try:
@@ -468,12 +517,20 @@ class SeldonCoreOperator(CharmBase):
             istio_gateway = gateway_info["gateway_namespace"] + "/" + gateway_info["gateway_name"]
         return istio_gateway
 
-    def _on_event(self, event) -> None:
-        """Perform all required actions for the Charm."""
+    # TODO: force_conflicts=True to work around issue
+    #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
+    #  a better solution.
+    def _on_event(self, event, force_conflicts: bool = True) -> None:
+        """Perform all required actions for the Charm.
+
+        Args:
+            force_conflicts (bool): Should only be used when need to resolved conflicts on K8S
+                                    resources.
+        """
         try:
             self._check_leader()
-            self._deploy_k8s_resources()
-            self._update_layer()
+            self._apply_k8s_resources(force_conflicts=force_conflicts)
+            self._update_layer(event)
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.info(f"Failed to handle {event} with error: {str(err)}")
@@ -486,8 +543,5 @@ class SeldonCoreOperator(CharmBase):
         return [{"running-models": [{"targets": [p for p in self._stored.targets.values()]}]}]
 
 
-#
-# Start main
-#
 if __name__ == "__main__":
     main(SeldonCoreOperator)
