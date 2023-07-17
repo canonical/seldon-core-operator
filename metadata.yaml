@@ -16,7 +16,7 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    upstream-source: 'docker.io/seldonio/seldon-core-operator:1.15.0'
+    upstream-source: 'docker.io/charmedkubeflow/seldon-core-operator:v1.15.0_22.04_1'
 requires:
   ambassador:
     interface: service-mesh
