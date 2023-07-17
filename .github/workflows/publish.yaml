@@ -44,7 +44,7 @@ jobs:
   publish-charm:
     name: Publish Charm
     runs-on: ubuntu-20.04
-    build-on: ubuntu-20.04
+    builds-on: ubuntu-20.04
     needs: get-charm-paths
     strategy:
       fail-fast: false
