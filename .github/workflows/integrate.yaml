@@ -72,6 +72,11 @@ jobs:
       run: juju status
       if: failure()
 
+    - uses: canonical/kubeflow-ci/actions/dump-charm-debug-artifacts@main
+      # always() if you want this to run on every run, regardless of failure.
+      # more details: https://docs.github.com/en/actions/learn-github-actions/expressions#status-check-functions
+      if: always()
+
     - name: Get workload logs
       run: kubectl logs --tail 100 -ntesting -lapp.kubernetes.io/name=seldon-controller-manager
       if: failure()
