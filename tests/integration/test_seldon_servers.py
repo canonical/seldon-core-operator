@@ -315,4 +315,3 @@ async def test_seldon_predictor_server(
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=120, idle_period=60
     )
-

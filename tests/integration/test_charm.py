@@ -328,4 +328,3 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
         namespace=ops_test.model_name,
     )
     assert not list(svc_list)
-

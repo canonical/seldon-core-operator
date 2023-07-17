@@ -50,4 +50,3 @@ def assert_deleted(logger, client, resource_class, resource_name, namespace):
             deleted = True
 
     assert deleted, f"Waited too long for {resource_class}/{resource_name} to be deleted!"
-
