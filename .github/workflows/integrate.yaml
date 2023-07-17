@@ -54,14 +54,13 @@ jobs:
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
       with:
+        juju-channel: 2.9/stable
         provider: microk8s
         channel: 1.24/stable
-        # Pinned until this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833
-        bootstrap-options: "--agent-version=2.9.34"
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
     - name: Run integration tests
-      run: tox -vve integration -- --model testing
+      run: tox -ve integration -- --model testing
 
     # On failure, capture debugging resources
     - name: Get all
