@@ -1,0 +1,28 @@
+# https://docs.seldon.io/projects/seldon-core/en/latest/servers/tensorflow.html
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: hpt
+spec:
+  name: hpt
+  protocol: tensorflow
+  transport: rest
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "125m"
+    limits:
+      memory: "128Mi"
+      cpu: "125m"
+  predictors:
+  - graph:
+      children: []
+      implementation: TENSORFLOW_SERVER
+      modelUri: gs://seldon-models/tfserving/half_plus_two
+      name:  classifier
+      parameters:
+        - name: model_name
+          type: STRING
+          value: classifier
+    name: default
+    replicas: 1
