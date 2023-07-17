@@ -91,6 +91,8 @@ jobs:
           charm-path: ${{ matrix.charm-path }}
           channel: ${{ steps.parse-inputs.outputs.destination_channel }}
           tag-prefix: ${{ steps.parse-inputs.outputs.tag_prefix }}
+        run: |
+          /usr/bin/sudo charmcraft pack --destructive-mode
 
       - uses: canonical/kubeflow-ci/actions/dump-charm-debug-artifacts@main
         # always() if you want this to run on every run, regardless of failure.
