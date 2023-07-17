@@ -6,9 +6,7 @@ name: On Pull Request
 
 on:
   pull_request:
-    secrets:
-      CHARMCRAFT_CREDENTIALS:
-        required: true
+
 jobs:
 
   tests:
@@ -21,11 +19,4 @@ jobs:
     name: Publish Charm
     uses: ./.github/workflows/publish.yaml
     secrets: inherit
-
-  debug:
-    name: debug
-    uses: canonical/kubeflow-ci/actions/dump-charm-debug-artifacts@main
-    # always() if you want this to run on every run, regardless of failure.
-    # more details: https://docs.github.com/en/actions/learn-github-actions/expressions#status-check-functions
-    if: always()
 

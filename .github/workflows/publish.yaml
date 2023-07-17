@@ -91,3 +91,8 @@ jobs:
           charm-path: ${{ matrix.charm-path }}
           channel: ${{ steps.parse-inputs.outputs.destination_channel }}
           tag-prefix: ${{ steps.parse-inputs.outputs.tag_prefix }}
+
+      - uses: canonical/kubeflow-ci/actions/dump-charm-debug-artifacts@main
+        # always() if you want this to run on every run, regardless of failure.
+        # more details: https://docs.github.com/en/actions/learn-github-actions/expressions#status-check-functions
+        if: always()
