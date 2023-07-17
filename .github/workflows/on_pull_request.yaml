@@ -17,6 +17,7 @@ jobs:
   # publish runs in parallel with tests, as we always publish in this situation
   publish-charm:
     name: Publish Charm
+    runs-on: ubuntu:20.04
     steps:
       - name: publish
         uses: ./.github/workflows/publish.yaml
