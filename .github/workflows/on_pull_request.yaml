@@ -18,10 +18,10 @@ jobs:
   publish-charm:
     name: Publish Charm
     runs-on: ubuntu:20.04
+    secrets: inherit
     steps:
       - name: publish
         uses: ./.github/workflows/publish.yaml
-        secrets: inherit
 
       - name: debug
         uses: canonical/kubeflow-ci/actions/dump-charm-debug-artifacts@main
