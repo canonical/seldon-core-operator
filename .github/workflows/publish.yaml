@@ -83,18 +83,14 @@ jobs:
           echo "setting output of tag_prefix=$tag_prefix"
           echo "::set-output name=tag_prefix::$tag_prefix"
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 15
-
       - name: Upload charm to charmhub
-        #uses: canonical/charming-actions/upload-charm@2.3.0
-        #with:
-        #  credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
-        #  github-token: ${{ secrets.GITHUB_TOKEN }}
-        #  charm-path: ${{ matrix.charm-path }}
-        #  channel: ${{ steps.parse-inputs.outputs.destination_channel }}
-        #  tag-prefix: ${{ steps.parse-inputs.outputs.tag_prefix }}
+        uses: canonical/charming-actions/upload-charm@2.3.0
+        with:
+          credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          charm-path: ${{ matrix.charm-path }}
+          channel: ${{ steps.parse-inputs.outputs.destination_channel }}
+          tag-prefix: ${{ steps.parse-inputs.outputs.tag_prefix }}
 
         run: |
           /usr/bin/sudo snap install charmcraft --classic --channel latest/stable
