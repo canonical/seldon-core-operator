@@ -4,7 +4,7 @@
 #
 #    pip-compile ./requirements-integration.in
 #
-aiohttp==3.8.4
+aiohttp==3.8.5
     # via -r ./requirements-integration.in
 aiosignal==1.3.1
     # via aiohttp
@@ -20,20 +20,29 @@ attrs==23.1.0
     # via aiohttp
 backcall==0.2.0
     # via ipython
+bcrypt==4.0.1
+    # via paramiko
+cachetools==5.3.1
+    # via google-auth
 certifi==2023.5.7
     # via
     #   -r ./requirements.txt
     #   httpcore
     #   httpx
+    #   kubernetes
     #   requests
 cffi==1.15.1
-    # via pynacl
+    # via
+    #   cryptography
+    #   pynacl
 charmed-kubeflow-chisme==0.0.11
     # via -r ./requirements.txt
 charset-normalizer==3.2.0
     # via
     #   aiohttp
     #   requests
+cryptography==41.0.2
+    # via paramiko
 decorator==5.1.1
     # via
     #   ipdb
@@ -53,6 +62,8 @@ frozenlist==1.4.0
     # via
     #   aiohttp
     #   aiosignal
+google-auth==2.22.0
+    # via kubernetes
 h11==0.14.0
     # via
     #   -r ./requirements.txt
@@ -86,12 +97,14 @@ jinja2==3.1.2
     #   -r ./requirements.txt
     #   charmed-kubeflow-chisme
     #   pytest-operator
-juju==0.7.2
+juju @ git+https://github.com/DnPlas/python-libjuju@dnplas-pyyaml-6
     # via
     #   -r ./requirements-integration.in
     #   pytest-operator
 jujubundlelib==0.5.7
     # via theblues
+kubernetes==27.2.0
+    # via juju
 lightkube==0.14.0
     # via
     #   -r ./requirements.txt
@@ -114,6 +127,12 @@ multidict==6.0.4
     # via
     #   aiohttp
     #   yarl
+mypy-extensions==1.0.0
+    # via typing-inspect
+oauthlib==3.2.2
+    # via
+    #   kubernetes
+    #   requests-oauthlib
 ops==2.4.1
     # via
     #   -r ./requirements.txt
@@ -124,6 +143,8 @@ ordered-set==4.1.0
     #   deepdiff
 packaging==23.1
     # via pytest
+paramiko==2.12.0
+    # via juju
 parso==0.8.3
     # via jedi
 pexpect==4.8.0
@@ -140,6 +161,13 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.2
     # via stack-data
+pyasn1==0.5.0
+    # via
+    #   juju
+    #   pyasn1-modules
+    #   rsa
+pyasn1-modules==0.3.0
+    # via google-auth
 pycparser==2.21
     # via cffi
 pygments==2.15.1
@@ -149,6 +177,7 @@ pymacaroons==0.13.0
 pynacl==1.5.0
     # via
     #   macaroonbakery
+    #   paramiko
     #   pymacaroons
 pyrfc3339==1.1
     # via
@@ -163,7 +192,7 @@ pytest-asyncio==0.21.1
 pytest-operator==0.28.0
     # via -r ./requirements-integration.in
 python-dateutil==2.8.2
-    # via juju
+    # via kubernetes
 pytz==2023.3
     # via pyrfc3339
 pyyaml==6.0.1
@@ -171,14 +200,21 @@ pyyaml==6.0.1
     #   -r ./requirements.txt
     #   juju
     #   jujubundlelib
+    #   kubernetes
     #   lightkube
     #   ops
     #   pytest-operator
 requests==2.31.0
     # via
     #   -r ./requirements-integration.in
+    #   kubernetes
     #   macaroonbakery
+    #   requests-oauthlib
     #   theblues
+requests-oauthlib==1.3.1
+    # via kubernetes
+rsa==4.9
+    # via google-auth
 ruamel-yaml==0.17.32
     # via
     #   -r ./requirements.txt
@@ -190,7 +226,10 @@ ruamel-yaml-clib==0.2.7
 six==1.16.0
     # via
     #   asttokens
+    #   google-auth
+    #   kubernetes
     #   macaroonbakery
+    #   paramiko
     #   pymacaroons
     #   python-dateutil
 sniffio==1.3.0
@@ -211,21 +250,31 @@ tomli==2.0.1
     # via
     #   ipdb
     #   pytest
+toposort==1.10
+    # via juju
 traitlets==5.9.0
     # via
     #   ipython
     #   matplotlib-inline
 typing-extensions==4.7.1
-    # via ipython
-urllib3==2.0.3
-    # via requests
+    # via
+    #   ipython
+    #   typing-inspect
+typing-inspect==0.9.0
+    # via juju
+urllib3==1.26.16
+    # via
+    #   google-auth
+    #   kubernetes
+    #   requests
 wcwidth==0.2.6
     # via prompt-toolkit
 websocket-client==1.6.1
     # via
     #   -r ./requirements.txt
+    #   kubernetes
     #   ops
-websockets==11.0.3
+websockets==7.0
     # via juju
 yarl==1.9.2
     # via aiohttp
