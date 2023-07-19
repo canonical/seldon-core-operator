@@ -10,4 +10,4 @@ bases:
       channel: "20.04"
 parts:
   charm:
-    charm-python-packages: [setuptools, pipi, cython<3.0.0]  # Fixes install of some packages
+    charm-python-packages: [setuptools, pip]  # Fixes install of some packages
