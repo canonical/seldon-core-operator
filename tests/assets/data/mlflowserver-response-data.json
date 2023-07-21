@@ -1,0 +1,24 @@
+{
+    "model_name": "classifier",
+    "model_version": "v1",
+    "id": "None",
+    "parameters": {
+        "content_type": "np"
+    },
+    "outputs": [
+        {
+            "name": "output-1",
+            "shape": [
+                1,
+                1
+            ],
+            "datatype": "FP64",
+            "parameters": {
+                "content_type": "np"
+            },
+            "data": [
+                6.016145744177844
+            ]
+        }
+    ]
+}
