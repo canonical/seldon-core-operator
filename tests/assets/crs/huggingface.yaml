@@ -1,0 +1,27 @@
+# https://github.com/SeldonIO/MLServer/blob/master/docs/examples/huggingface/README.md
+apiVersion: machinelearning.seldon.io/v1
+kind: SeldonDeployment
+metadata:
+  name: transformer
+spec:
+  protocol: v2
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
+  predictors:
+  - graph:
+      name: classifier
+      implementation: HUGGINGFACE_SERVER
+      parameters:
+      - name: task
+        type: STRING
+        value: text-generation
+      - name: pretrained_model
+        type: STRING
+        value: distilgpt2
+    name: default
+    replicas: 1
