@@ -46,7 +46,11 @@ jobs:
   integration:
     name: Integration Test (build and deploy)
     runs-on: ubuntu-20.04
-
+    strategy:
+      matrix:
+        tox-environments:
+          - charm-integration
+          - seldon-servers-integration
     steps:
     - name: Check out repo
       uses: actions/checkout@v2
@@ -60,7 +64,7 @@ jobs:
         microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
     - name: Run integration tests
-      run: tox -ve integration -- --model testing
+      run: tox -ve {{ matrix.tox-environments }} -- --model testing
 
     # On failure, capture debugging resources
     - name: Get all
