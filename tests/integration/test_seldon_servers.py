@@ -33,7 +33,7 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     plural="seldondeployments",
     verbs=None,
 )
-TEST_LABEL = {"testing-seldon-deployments": "foo"}
+TEST_LABEL = {"testing-seldon-deployments": "true"}
 
 @pytest.fixture(scope="session")
 def lightkube_client() -> Client:
@@ -265,11 +265,10 @@ async def test_seldon_predictor_server(
         if "protocol" in deploy_yaml["spec"]:
             protocol = deploy_yaml["spec"]["protocol"]
         sdep = SELDON_DEPLOYMENT(deploy_yaml)
-        lightkube_client.create(sdep, namespace=namespace)
         # Add a label to the SeldonDeployment so it is easy to interact with it
         # by simply listing the resources that match the test label.
-        patch = {'metadata': {'labels': TEST_LABEL}}
-        lightkube_client.patch(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, obj=patch)
+        sdep.metadata.labels.update(TEST_LABEL)
+        lightkube_client.create(sdep, namespace=namespace)
 
     # prepare request data:
     # - if it is string, load it from file specified by that string
