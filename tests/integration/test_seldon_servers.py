@@ -33,7 +33,30 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     plural="seldondeployments",
     verbs=None,
 )
+ML_MODEL = ""
 
+@pytest.fixture(scope="session")
+def lightkube_client() -> Client:
+    """Return an instantiated lightkube client to use during the session."""
+    lightkube_client = Client(field_manager="kserve")
+    return lightkube_client
+
+@pytest.fixture(scope="module")
+def patch_namespace_with_seldon_label(lightkube_client: Client, ops_test: OpsTest):
+    """Patch the current namespace with Seldon specific labels."""
+    this_ns = lightkube_client.get(res=Namespace, name=ops_test.model_name)
+    this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
+    lightkube_client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
+
+@pytest.fixture()
+def remove_seldon_deployment(lightkube_client: Client, ops_test: OpsTest):
+    """Remove SeldonDeployment even if the test case fails."""
+    yield
+
+    # remove Seldon Deployment
+    namespace = ops_test.model_name
+    lightkube_client.delete(SELDON_DEPLOYMENT, name=ML_MODEL, namespace=namespace, grace_period=0)
+    utils.assert_deleted(logger, lightkube_client, SELDON_DEPLOYMENT, ML_MODEL, namespace=namespace)
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -223,31 +246,29 @@ async def test_build_and_deploy(ops_test: OpsTest):
 )
 @pytest.mark.asyncio
 async def test_seldon_predictor_server(
-    ops_test: OpsTest, server_name, server_config, url, request_data, response_test_data
+    server_name, server_config, url, request_data, response_test_data, lightkube_client, remove_seldon_deployment, ops_test: OpsTest, patch_namespace_with_seldon_label,
 ):
     """Test Seldon predictor server.
 
     Workload deploys Seldon predictor servers defined in ConfigMap.
     Each server is deployed and inference request is triggered, and response is evaluated.
     """
-    # NOTE: This test is re-using deployment created in test_build_and_deploy()
+
     namespace = ops_test.model_name
-    client = Client()
-
-    this_ns = client.get(res=Namespace, name=namespace)
-    this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
-    client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
-
     # retrieve predictor server information and create Seldon Depoloyment
     with open(f"tests/assets/crs/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
-        ml_model = deploy_yaml["metadata"]["name"]
+        # NOTE: Change the value of the global var ML_MODEL according to the Seldon Deployment
+        # that is applied. Changing the global variable will make it easier to remove this
+        # resource in the remove_seldon_deployment fixture without doing more complex fixture magic.
+        global ML_MODEL
+        ML_MODEL = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
         protocol = "seldon"  # default protocol
         if "protocol" in deploy_yaml["spec"]:
             protocol = deploy_yaml["spec"]["protocol"]
         sdep = SELDON_DEPLOYMENT(deploy_yaml)
-        client.create(sdep, namespace=namespace)
+        lightkube_client.create(sdep, namespace=namespace)
 
     # prepare request data:
     # - if it is string, load it from file specified by that string
@@ -266,11 +287,11 @@ async def test_seldon_predictor_server(
             response_test_data = json.load(f)
 
     # wait for SeldonDeployment to become available
-    utils.assert_available(logger, client, SELDON_DEPLOYMENT, ml_model, namespace)
+    utils.assert_available(logger, lightkube_client, SELDON_DEPLOYMENT, ML_MODEL, namespace)
 
     # obtain prediction service endpoint
-    service_name = f"{ml_model}-{predictor}-classifier"
-    service = client.get(Service, name=service_name, namespace=namespace)
+    service_name = f"{ML_MODEL}-{predictor}-classifier"
+    service = lightkube_client.get(Service, name=service_name, namespace=namespace)
     service_ip = service.spec.clusterIP
     service_port = next(p for p in service.spec.ports if p.name == "http").port
 
@@ -291,7 +312,7 @@ async def test_seldon_predictor_server(
     if protocol == "seldon":
         # retrieve predictor server image from configmap to implicitly verify that it matches
         # deployed predictor server image
-        configmap = client.get(
+        configmap = lightkube_client.get(
             ConfigMap,
             name="seldon-config",
             namespace=ops_test.model_name,
@@ -306,10 +327,6 @@ async def test_seldon_predictor_server(
 
     # verify prediction response
     assert sorted(response.items()) == sorted(response_test_data.items())
-
-    # remove Seldon Deployment
-    client.delete(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, grace_period=0)
-    utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # wait for application to settle
     await ops_test.model.wait_for_idle(
