@@ -267,6 +267,8 @@ async def test_seldon_predictor_server(
         sdep = SELDON_DEPLOYMENT(deploy_yaml)
         # Add a label to the SeldonDeployment so it is easy to interact with it
         # by simply listing the resources that match the test label.
+        if sdep.metadata.labels is None:
+            sdep.metadata.labels = {}
         sdep.metadata.labels.update(TEST_LABEL)
         lightkube_client.create(sdep, namespace=namespace)
 
