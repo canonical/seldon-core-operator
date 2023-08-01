@@ -33,7 +33,7 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     plural="seldondeployments",
     verbs=None,
 )
-ML_MODEL = ""
+TEST_LABEL = {"testing-seldon-deployments": "foo"}
 
 @pytest.fixture(scope="session")
 def lightkube_client() -> Client:
@@ -55,8 +55,10 @@ def remove_seldon_deployment(lightkube_client: Client, ops_test: OpsTest):
 
     # remove Seldon Deployment
     namespace = ops_test.model_name
-    lightkube_client.delete(SELDON_DEPLOYMENT, name=ML_MODEL, namespace=namespace, grace_period=0)
-    utils.assert_deleted(logger, lightkube_client, SELDON_DEPLOYMENT, ML_MODEL, namespace=namespace)
+    resource_to_delete = lightkube_client.list(SELDON_DEPLOYMENT, namespace=namespace, labels=TEST_LABEL)
+    for obj in resource_to_delete:
+        lightkube_client.delete(SELDON_DEPLOYMENT, name=obj.metadata.name, namespace=namespace, grace_period=0)
+        utils.assert_deleted(logger, lightkube_client, SELDON_DEPLOYMENT, obj.metadata.name, namespace=namespace)
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -253,22 +255,21 @@ async def test_seldon_predictor_server(
     Workload deploys Seldon predictor servers defined in ConfigMap.
     Each server is deployed and inference request is triggered, and response is evaluated.
     """
-
     namespace = ops_test.model_name
     # retrieve predictor server information and create Seldon Depoloyment
     with open(f"tests/assets/crs/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
-        # NOTE: Change the value of the global var ML_MODEL according to the Seldon Deployment
-        # that is applied. Changing the global variable will make it easier to remove this
-        # resource in the remove_seldon_deployment fixture without doing more complex fixture magic.
-        global ML_MODEL
-        ML_MODEL = deploy_yaml["metadata"]["name"]
+        ml_model = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
         protocol = "seldon"  # default protocol
         if "protocol" in deploy_yaml["spec"]:
             protocol = deploy_yaml["spec"]["protocol"]
         sdep = SELDON_DEPLOYMENT(deploy_yaml)
         lightkube_client.create(sdep, namespace=namespace)
+        # Add a label to the SeldonDeployment so it is easy to interact with it
+        # by simply listing the resources that match the test label.
+        patch = {'metadata': {'labels': TEST_LABEL}}
+        lightkube_client.patch(SELDON_DEPLOYMENT, name=ml_model, namespace=namespace, obj=patch)
 
     # prepare request data:
     # - if it is string, load it from file specified by that string
@@ -287,10 +288,10 @@ async def test_seldon_predictor_server(
             response_test_data = json.load(f)
 
     # wait for SeldonDeployment to become available
-    utils.assert_available(logger, lightkube_client, SELDON_DEPLOYMENT, ML_MODEL, namespace)
+    utils.assert_available(logger, lightkube_client, SELDON_DEPLOYMENT, ml_model, namespace)
 
     # obtain prediction service endpoint
-    service_name = f"{ML_MODEL}-{predictor}-classifier"
+    service_name = f"{ml_model}-{predictor}-classifier"
     service = lightkube_client.get(Service, name=service_name, namespace=namespace)
     service_ip = service.spec.clusterIP
     service_port = next(p for p in service.spec.ports if p.name == "http").port
