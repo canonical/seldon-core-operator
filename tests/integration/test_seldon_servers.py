@@ -35,11 +35,13 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
 )
 TEST_LABEL = {"testing-seldon-deployments": "true"}
 
+
 @pytest.fixture(scope="session")
 def lightkube_client() -> Client:
     """Return an instantiated lightkube client to use during the session."""
     lightkube_client = Client(field_manager="kserve")
     return lightkube_client
+
 
 @pytest.fixture(scope="module")
 def patch_namespace_with_seldon_label(lightkube_client: Client, ops_test: OpsTest):
@@ -48,6 +50,7 @@ def patch_namespace_with_seldon_label(lightkube_client: Client, ops_test: OpsTes
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     lightkube_client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
+
 @pytest.fixture()
 def remove_seldon_deployment(lightkube_client: Client, ops_test: OpsTest):
     """Remove SeldonDeployment even if the test case fails."""
@@ -55,10 +58,17 @@ def remove_seldon_deployment(lightkube_client: Client, ops_test: OpsTest):
 
     # remove Seldon Deployment
     namespace = ops_test.model_name
-    resource_to_delete = lightkube_client.list(SELDON_DEPLOYMENT, namespace=namespace, labels=TEST_LABEL)
+    resource_to_delete = lightkube_client.list(
+        SELDON_DEPLOYMENT, namespace=namespace, labels=TEST_LABEL
+    )
     for obj in resource_to_delete:
-        lightkube_client.delete(SELDON_DEPLOYMENT, name=obj.metadata.name, namespace=namespace, grace_period=0)
-        utils.assert_deleted(logger, lightkube_client, SELDON_DEPLOYMENT, obj.metadata.name, namespace=namespace)
+        lightkube_client.delete(
+            SELDON_DEPLOYMENT, name=obj.metadata.name, namespace=namespace, grace_period=0
+        )
+        utils.assert_deleted(
+            logger, lightkube_client, SELDON_DEPLOYMENT, obj.metadata.name, namespace=namespace
+        )
+
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -248,7 +258,15 @@ async def test_build_and_deploy(ops_test: OpsTest):
 )
 @pytest.mark.asyncio
 async def test_seldon_predictor_server(
-    server_name, server_config, url, request_data, response_test_data, lightkube_client, remove_seldon_deployment, ops_test: OpsTest, patch_namespace_with_seldon_label,
+    server_name,
+    server_config,
+    url,
+    request_data,
+    response_test_data,
+    lightkube_client,
+    remove_seldon_deployment,
+    ops_test: OpsTest,
+    patch_namespace_with_seldon_label,
 ):
     """Test Seldon predictor server.
 
