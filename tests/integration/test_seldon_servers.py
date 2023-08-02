@@ -40,7 +40,7 @@ TEST_LABEL = {"testing-seldon-deployments": "true"}
 @pytest.fixture(scope="session")
 def lightkube_client() -> Client:
     """Return an instantiated lightkube client to use during the session."""
-    lightkube_client = Client(field_manager="kserve")
+    lightkube_client = Client(field_manager="seldon-tests")
     return lightkube_client
 
 
@@ -285,7 +285,12 @@ async def test_seldon_predictor_server(
             protocol = deploy_yaml["spec"]["protocol"]
         # Add a label to the SeldonDeployment so it is easy to interact with it
         # by simply listing the resources that match the test label.
-        sdep = SELDON_DEPLOYMENT(deploy_yaml, metadata=ObjectMeta(labels=TEST_LABEL))
+        sdep = SELDON_DEPLOYMENT(
+            deploy_yaml,
+            metadata=ObjectMeta(
+                name=deploy_yaml["metadata"]["name"], namespace=namespace, labels=TEST_LABEL
+            ),
+        )
         lightkube_client.create(sdep, namespace=namespace)
 
     # prepare request data:
