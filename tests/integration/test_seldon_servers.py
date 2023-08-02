@@ -17,6 +17,7 @@ import utils
 import yaml
 from lightkube import ApiError, Client, codecs
 from lightkube.generic_resource import create_namespaced_resource
+from lightkube.models.meta_v1 import ObjectMeta
 from lightkube.resources.apiextensions_v1 import CustomResourceDefinition
 from lightkube.resources.apps_v1 import Deployment
 from lightkube.resources.core_v1 import ConfigMap, Namespace, Pod, Service
@@ -282,12 +283,9 @@ async def test_seldon_predictor_server(
         protocol = "seldon"  # default protocol
         if "protocol" in deploy_yaml["spec"]:
             protocol = deploy_yaml["spec"]["protocol"]
-        sdep = SELDON_DEPLOYMENT(deploy_yaml)
         # Add a label to the SeldonDeployment so it is easy to interact with it
         # by simply listing the resources that match the test label.
-        if sdep.metadata.labels is None:
-            sdep.metadata.labels = {}
-        sdep.metadata.labels.update(TEST_LABEL)
+        sdep = SELDON_DEPLOYMENT(deploy_yaml, metadata=ObjectMeta(labels=TEST_LABEL))
         lightkube_client.create(sdep, namespace=namespace)
 
     # prepare request data:
