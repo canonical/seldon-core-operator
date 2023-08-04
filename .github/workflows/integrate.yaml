@@ -72,10 +72,11 @@ jobs:
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
       with:
-        juju-channel: 2.9/stable
         provider: microk8s
         channel: 1.24/stable
-        microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
+        microk8s-addons: "dns hostpath-storage rbac metallb:10.64.140.43-10.64.140.49"
+        juju-channel: 2.9/stable
+        charmcraft-channel: latest/candidate
 
     - name: Run integration tests
       run: tox -ve ${{ matrix.tox-environments }} -- --model testing

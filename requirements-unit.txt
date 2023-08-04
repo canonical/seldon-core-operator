@@ -5,70 +5,52 @@
 #    pip-compile ./requirements-unit.in
 #
 anyio==3.7.1
+    # via httpcore
+certifi==2023.7.22
     # via
-    #   -r ./requirements.txt
-    #   httpcore
-certifi==2023.5.7
-    # via
-    #   -r ./requirements.txt
     #   httpcore
     #   httpx
 charmed-kubeflow-chisme==0.0.11
-    # via -r ./requirements.txt
+    # via -r ./requirements.in
 coverage==7.2.7
     # via -r ./requirements-unit.in
 deepdiff==6.2.1
-    # via
-    #   -r ./requirements.txt
-    #   charmed-kubeflow-chisme
+    # via charmed-kubeflow-chisme
 exceptiongroup==1.1.2
     # via
-    #   -r ./requirements.txt
     #   anyio
     #   pytest
 h11==0.14.0
-    # via
-    #   -r ./requirements.txt
-    #   httpcore
+    # via httpcore
 httpcore==0.17.3
-    # via
-    #   -r ./requirements.txt
-    #   httpx
+    # via httpx
 httpx==0.24.1
-    # via
-    #   -r ./requirements.txt
-    #   lightkube
+    # via lightkube
 idna==3.4
     # via
-    #   -r ./requirements.txt
     #   anyio
     #   httpx
 iniconfig==2.0.0
     # via pytest
 jinja2==3.1.2
-    # via
-    #   -r ./requirements.txt
-    #   charmed-kubeflow-chisme
+    # via charmed-kubeflow-chisme
 lightkube==0.14.0
     # via
-    #   -r ./requirements.txt
+    #   -r ./requirements.in
     #   charmed-kubeflow-chisme
 lightkube-models==1.27.1.4
     # via
-    #   -r ./requirements.txt
+    #   -r ./requirements.in
     #   lightkube
 markupsafe==2.1.3
-    # via
-    #   -r ./requirements.txt
-    #   jinja2
+    # via jinja2
 ops==2.4.1
     # via
-    #   -r ./requirements.txt
+    #   -r ./requirements-unit.in
+    #   -r ./requirements.in
     #   charmed-kubeflow-chisme
 ordered-set==4.1.0
-    # via
-    #   -r ./requirements.txt
-    #   deepdiff
+    # via deepdiff
 packaging==23.1
     # via pytest
 pluggy==1.2.0
@@ -84,30 +66,23 @@ pytest-mock==3.11.1
     # via -r ./requirements-unit.in
 pyyaml==6.0.1
     # via
-    #   -r ./requirements.txt
+    #   -r ./requirements-unit.in
     #   lightkube
     #   ops
 ruamel-yaml==0.17.32
-    # via
-    #   -r ./requirements.txt
-    #   charmed-kubeflow-chisme
+    # via charmed-kubeflow-chisme
 ruamel-yaml-clib==0.2.7
-    # via
-    #   -r ./requirements.txt
-    #   ruamel-yaml
+    # via ruamel-yaml
 sniffio==1.3.0
     # via
-    #   -r ./requirements.txt
     #   anyio
     #   httpcore
     #   httpx
 tenacity==8.2.2
     # via
-    #   -r ./requirements.txt
+    #   -r ./requirements.in
     #   charmed-kubeflow-chisme
 tomli==2.0.1
     # via pytest
 websocket-client==1.6.1
-    # via
-    #   -r ./requirements.txt
-    #   ops
+    # via ops
