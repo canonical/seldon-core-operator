@@ -46,21 +46,40 @@ jobs:
   integration:
     name: Integration Test (build and deploy)
     runs-on: ubuntu-20.04
-
+    strategy:
+      matrix:
+        tox-environments:
+          - charm-integration
+          - seldon-servers-integration
     steps:
+    # Ideally we'd use self-hosted runners, but this effort is still not stable.
+    # This action will remove unused software (dotnet, haskell, android libs, codeql,
+    # and docker images) from the GH runner, which will liberate around 60 GB of storage
+    # distributed in 40GB for root and around 20 for a mnt point.
+    - name: Maximise GH runner space
+      uses: easimon/maximize-build-space@v7
+      with:
+        root-reserve-mb: 40960
+        remove-dotnet: 'true'
+        remove-haskell: 'true'
+        remove-android: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
+
     - name: Check out repo
       uses: actions/checkout@v2
 
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
       with:
-        juju-channel: 2.9/stable
         provider: microk8s
         channel: 1.24/stable
-        microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
+        microk8s-addons: "dns hostpath-storage rbac metallb:10.64.140.43-10.64.140.49"
+        juju-channel: 2.9/stable
+        charmcraft-channel: latest/candidate
 
     - name: Run integration tests
-      run: tox -ve integration -- --model testing
+      run: tox -ve ${{ matrix.tox-environments }} -- --model testing
 
     # On failure, capture debugging resources
     - name: Get all

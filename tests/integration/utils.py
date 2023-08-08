@@ -1,4 +1,4 @@
-# Copyright 2022 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 #
 import tenacity
@@ -8,8 +8,8 @@ from lightkube import ApiError
 
 
 @tenacity.retry(
-    wait=tenacity.wait_exponential(multiplier=2, min=1, max=10),
-    stop=tenacity.stop_after_attempt(80),
+    wait=tenacity.wait_exponential(multiplier=2, min=4, max=10),
+    stop=tenacity.stop_after_attempt(90),
     reraise=True,
 )
 def assert_available(logger, client, resource_class, resource_name, namespace):
