@@ -33,6 +33,25 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     plural="seldondeployments",
     verbs=None,
 )
+SELDON_CM_NAME = "seldon-config"
+SELDON_CONFIG = {
+    "credentials": '{\n   "gcs" : {\n       "gcsCredentialFileName": "gcloud-application-credentials.json"\n   },\n   "s3" : {\n       "s3AccessKeyIDName": "awsAccessKeyID",\n       "s3SecretAccessKeyName": "awsSecretAccessKey"\n   }\n}',
+    "explainer": '{\n    "image" : "seldonio/alibiexplainer:1.15.0",\n    "image_v2" : "seldonio/mlserver:1.2.0-alibi-explain"\n}',
+    "predictor_servers": '{\n    "TENSORFLOW_SERVER": {\n      "protocols" : {\n        "tensorflow": {\n          "image": "tensorflow/serving",\n          "defaultImageVersion": "2.1.0"\n          },\n        "seldon": {\n          "image": "seldonio/tfserving-proxy",\n          "defaultImageVersion": "1.15.0"\n          }\n        }\n    },\n    "SKLEARN_SERVER": {\n      "protocols" : {\n        "seldon": {\n          "image": "docker.io/charmedkubeflow/sklearnserver",\n          "defaultImageVersion": "v1.16.0_20.04_1"\n          },\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-sklearn",\n          "defaultImageVersion": "1.2.0_22.04_1"\n          }\n        }\n    },\n    "XGBOOST_SERVER": {\n      "protocols" : {\n        "seldon": {\n          "image": "seldonio/xgboostserver",\n          "defaultImageVersion": "1.15.0"\n          },\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-xgboost",\n          "defaultImageVersion": "1.2.0_22.04_1"\n          }\n        }\n    },\n    "MLFLOW_SERVER": {\n      "protocols" : {\n        "seldon": {\n          "image": "seldonio/mlflowserver",\n          "defaultImageVersion": "1.15.0"\n          },\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-mlflow",\n          "defaultImageVersion": "1.2.0_22.04_1"\n          }\n        }\n    },\n    "TRITON_SERVER": {\n      "protocols" : {\n        "v2": {\n          "image": "nvcr.io/nvidia/tritonserver",\n          "defaultImageVersion": "21.08-py3"\n          }\n        }\n    },\n    "HUGGINGFACE_SERVER": {\n      "protocols" : {\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-huggingface",\n          "defaultImageVersion": "1.2.4_22.04_1"\n          }\n        }\n    },\n    "TEMPO_SERVER": {\n      "protocols" : {\n        "v2": {\n          "image": "seldonio/mlserver",\n          "defaultImageVersion": "1.2.0-slim"\n          }\n        }\n    }\n}',
+    "storageInitializer": '{\n    "image" : "seldonio/rclone-storage-initializer:1.14.1",\n    "memoryRequest": "100Mi",\n    "memoryLimit": "1Gi",\n    "cpuRequest": "100m",\n    "cpuLimit": "1"\n}',
+}
+SELDON_CONFIG_CHANGED = {
+    "credentials": '{\n   "gcs" : {\n       "gcsCredentialFileName": "gcloud-application-credentials.json"\n   },\n   "s3" : {\n       "s3AccessKeyIDName": "awsAccessKeyID",\n       "s3SecretAccessKeyName": "awsSecretAccessKey"\n   }\n}',
+    "explainer": '{\n    "image" : "custom:2.0",\n    "image_v2" : "seldonio/mlserver:1.2.0-alibi-explain"\n}',
+    "predictor_servers": '{\n    "TENSORFLOW_SERVER": {\n      "protocols" : {\n        "tensorflow": {\n          "image": "tensorflow/serving",\n          "defaultImageVersion": "2.1.0"\n          },\n        "seldon": {\n          "image": "seldonio/tfserving-proxy",\n          "defaultImageVersion": "1.15.0"\n          }\n        }\n    },\n    "SKLEARN_SERVER": {\n      "protocols" : {\n        "seldon": {\n          "image": "docker.io/charmedkubeflow/sklearnserver",\n          "defaultImageVersion": "v1.16.0_20.04_1"\n          },\n        "v2": {\n          "image": "custom",\n          "defaultImageVersion": "1.0"\n          }\n        }\n    },\n    "XGBOOST_SERVER": {\n      "protocols" : {\n        "seldon": {\n          "image": "seldonio/xgboostserver",\n          "defaultImageVersion": "1.15.0"\n          },\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-xgboost",\n          "defaultImageVersion": "1.2.0_22.04_1"\n          }\n        }\n    },\n    "MLFLOW_SERVER": {\n      "protocols" : {\n        "seldon": {\n          "image": "seldonio/mlflowserver",\n          "defaultImageVersion": "1.15.0"\n          },\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-mlflow",\n          "defaultImageVersion": "1.2.0_22.04_1"\n          }\n        }\n    },\n    "TRITON_SERVER": {\n      "protocols" : {\n        "v2": {\n          "image": "nvcr.io/nvidia/tritonserver",\n          "defaultImageVersion": "21.08-py3"\n          }\n        }\n    },\n    "HUGGINGFACE_SERVER": {\n      "protocols" : {\n        "v2": {\n          "image": "docker.io/charmedkubeflow/mlserver-huggingface",\n          "defaultImageVersion": "1.2.4_22.04_1"\n          }\n        }\n    },\n    "TEMPO_SERVER": {\n      "protocols" : {\n        "v2": {\n          "image": "seldonio/mlserver",\n          "defaultImageVersion": "1.2.0-slim"\n          }\n        }\n    }\n}',
+    "storageInitializer": '{\n    "image" : "seldonio/rclone-storage-initializer:1.14.1",\n    "memoryRequest": "100Mi",\n    "memoryLimit": "1Gi",\n    "cpuRequest": "100m",\n    "cpuLimit": "1"\n}',
+}
+
+
+@pytest.fixture(scope="session")
+def lightkube_client() -> Client:
+    client = Client(field_manager=APP_NAME)
+    return client
 
 
 @pytest.mark.abort_on_fail
@@ -54,6 +73,55 @@ async def test_build_and_deploy(ops_test: OpsTest):
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=30
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
+
+
+@pytest.mark.abort_on_fail
+async def test_configmap_created(lightkube_client: Client, ops_test: OpsTest):
+    """Test configmaps contents with default coonfig."""
+    seldon_config_cm = lightkube_client.get(
+        ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
+    )
+
+    assert seldon_config_cm.data == SELDON_CONFIG
+
+
+@pytest.mark.abort_on_fail
+async def test_configmap_changes_with_config(lightkube_client: Client, ops_test: OpsTest):
+    await ops_test.model.applications[APP_NAME].set_config(
+        {
+            "custom_images": '{"configmap__predictor__sklearn__v2": "custom:1.0", "configmap_explainer": "custom:2.0"}'  # noqa: E501
+        }
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=300
+    )
+    seldon_config_cm = lightkube_client.get(
+        ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
+    )
+
+    assert seldon_config_cm.data == SELDON_CONFIG_CHANGED
+
+
+@pytest.mark.abort_on_fail
+async def test_blocked_on_invalid_config(ops_test: OpsTest):
+    await ops_test.model.applications[APP_NAME].set_config({"custom_images": "{"})
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="blocked", raise_on_blocked=False, timeout=300
+    )
+    assert ops_test.model.applications[APP_NAME].units[0].workload_status == "blocked"
+
+
+@pytest.mark.abort_on_fail
+async def test_back_to_active_on_config(lightkube_client: Client, ops_test: OpsTest):
+    await ops_test.model.applications[APP_NAME].set_config({"custom_images": "{}"})
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300
+    )
+    seldon_config_cm = lightkube_client.get(
+        ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
+    )
+
+    assert seldon_config_cm.data == SELDON_CONFIG
 
 
 async def test_seldon_istio_relation(ops_test: OpsTest):

@@ -7,6 +7,23 @@ options:
     type: string
     default: '4443'
     description: Webhook server port
+  custom_images:
+    type: string
+    default: |
+      configmap__predictor__tensorflow__tensorflow: ''
+      configmap__predictor__tensorflow__seldon: ''
+      configmap__predictor__sklearn__seldon: ''
+      configmap__predictor__sklearn__v2: ''
+      configmap__predictor__xgboost__seldon: ''
+      configmap__predictor__xgboost__v2: ''
+      configmap__predictor__mlflow__seldon: ''
+      configmap__predictor__mlflow__v2: ''
+      configmap__predictor__triton__v2: ''
+      configmap__predictor__huggingface__v2: ''
+      configmap__predictor__tempo_server__v2: ''
+      configmap_storageInitializer: ''
+      configmap_explainer: ''
+      configmap_explainer_v2: ''
   ambassador-single-namespace:
     type: boolean
     default: false

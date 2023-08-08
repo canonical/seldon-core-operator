@@ -10,7 +10,9 @@ import tempfile
 from base64 import b64encode
 from pathlib import Path
 from subprocess import DEVNULL, check_call
+from typing import Dict
 
+import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -25,7 +27,7 @@ from lightkube.resources.core_v1 import ConfigMap
 from ops.charm import CharmBase
 from ops.framework import EventBase, StoredState
 from ops.main import main
-from ops.model import ActiveStatus, Container, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, Container, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer, ProtocolError
 
 K8S_RESOURCE_FILES = [
@@ -42,6 +44,49 @@ CONFIGMAP_RESOURCE_FILES = [
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 CONTAINER_CERTS_DEST = "/tmp/k8s-webhook-server/serving-certs/"
 
+DEFAULT_IMAGES = {
+    "configmap__predictor__tensorflow__tensorflow": "tensorflow/serving:2.1.0",
+    "configmap__predictor__tensorflow__seldon": "seldonio/tfserving-proxy:1.15.0",
+    "configmap__predictor__sklearn__seldon": "docker.io/charmedkubeflow/sklearnserver:v1.16.0_20.04_1",  # noqa: E501
+    "configmap__predictor__sklearn__v2": "docker.io/charmedkubeflow/mlserver-sklearn:1.2.0_22.04_1",
+    "configmap__predictor__xgboost__seldon": "seldonio/xgboostserver:1.15.0",
+    "configmap__predictor__xgboost__v2": "docker.io/charmedkubeflow/mlserver-xgboost:1.2.0_22.04_1",
+    "configmap__predictor__mlflow__seldon": "seldonio/mlflowserver:1.15.0",
+    "configmap__predictor__mlflow__v2": "docker.io/charmedkubeflow/mlserver-mlflow:1.2.0_22.04_1",
+    "configmap__predictor__triton__v2": "nvcr.io/nvidia/tritonserver:21.08-py3",
+    "configmap__predictor__huggingface__v2": "docker.io/charmedkubeflow/mlserver-huggingface:1.2.4_22.04_1",  # noqa: E501
+    "configmap__predictor__tempo_server__v2": "seldonio/mlserver:1.2.0-slim",
+    "configmap_storageInitializer": "seldonio/rclone-storage-initializer:1.14.1",
+    "configmap_explainer": "seldonio/alibiexplainer:1.15.0",
+    "configmap_explainer_v2": "seldonio/mlserver:1.2.0-alibi-explain",
+}
+
+
+def parse_images_config(config: str):
+    """
+    Parse a YAML config-defined images list.
+
+    This function takes a YAML-formatted string 'config' containing a list of images
+    and returns a dictionaryrepresenting the images.
+
+    Args:
+        config (str): YAML-formatted string representing a list of images.
+
+    Returns:
+        Dict: A list of images.
+    """
+    error_message = (
+        f"Cannot parse a config-defined images list from config '{config}' - this "
+        "config input will be ignored."
+    )
+    if not config:
+        return []
+    try:
+        images = yaml.safe_load(config)
+    except yaml.YAMLError:
+        raise ErrorWithStatus(error_message, BlockedStatus)
+    return images
+
 
 class SeldonCoreOperator(CharmBase):
     """A Juju Charm for Seldon Core Operator."""
@@ -53,6 +98,8 @@ class SeldonCoreOperator(CharmBase):
         super().__init__(*args)
 
         # retrieve configuration and base settings
+        self.custom_images = []
+        self.images_context = {}
         self.logger = logging.getLogger(__name__)
         self._gateway = GatewayRequirer(self)
         self._namespace = self.model.name
@@ -162,11 +209,14 @@ class SeldonCoreOperator(CharmBase):
     @property
     def configmap_resource_handler(self):
         """Update K8S with ConfigMap resources."""
+        self.custom_images = parse_images_config(self.model.config["custom_images"])
+        self.images_context = self.get_images(DEFAULT_IMAGES, self.custom_images)
+
         if not self._configmap_resource_handler:
             self._configmap_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
                 template_files=CONFIGMAP_RESOURCE_FILES,
-                context=self._context,
+                context={**self._context, **self.images_context},
                 logger=self.logger,
             )
         load_in_cluster_generic_resources(self._configmap_resource_handler.lightkube_client)
@@ -250,6 +300,52 @@ class SeldonCoreOperator(CharmBase):
         }
 
         return Layer(layer_config)
+
+    def get_images(
+        self, default_images: Dict[str, str], custom_images: Dict[str, str]
+    ) -> Dict[str, str]:
+        """
+        Combine default images with custom images.
+
+        This function takes two dictionaries, 'default_images' and 'custom_images',
+        representing the default set of images and the custom set of images respectively.
+        It combines the custom images into the default image list, overriding any matching
+        image names from the default list with the custom ones.
+        Args:
+            default_images (Dict[str, str]): A dictionary containing the default image names
+                as keys and their corresponding default image URIs as values.
+            custom_images (Dict[str, str]): A dictionary containing the custom image names
+                as keys and their corresponding custom image URIs as values.
+        Returns:
+            Dict[str, str]: A dictionary representing the combined images, where image names
+            from the custom_images override any matching image names from the default_images.
+        """
+        images = default_images
+        for image_name, custom_image in custom_images.items():
+            if custom_image:
+                if image_name in images:
+                    images[image_name] = custom_image
+                else:
+                    self.logger.warning(f"image_name {image_name} not in image list, ignoring.")
+
+        # This are special cases comfigmap where they need to be split into image and version
+        for image_name in [
+            "configmap__predictor__tensorflow__tensorflow",
+            "configmap__predictor__tensorflow__seldon",
+            "configmap__predictor__sklearn__seldon",
+            "configmap__predictor__sklearn__v2",
+            "configmap__predictor__xgboost__seldon",
+            "configmap__predictor__xgboost__v2",
+            "configmap__predictor__mlflow__seldon",
+            "configmap__predictor__mlflow__v2",
+            "configmap__predictor__triton__v2",
+            "configmap__predictor__huggingface__v2",
+            "configmap__predictor__tempo_server__v2",
+        ]:
+            images[f"{image_name}__image"], images[f"{image_name}__version"] = images[
+                image_name
+            ].split(":")
+        return images
 
     def _check_leader(self):
         """Check if this unit is a leader."""
@@ -356,13 +452,18 @@ class SeldonCoreOperator(CharmBase):
                 raise GenericCharmRuntimeError("ConfigMap resources creation failed") from error
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _on_install(self, _):
+    def _on_install(self, event):
         """Installation only tasks."""
         # deploy K8S resources to speed up deployment
         # TODO: force_conflicts=True to work around issue
         #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
         #  a better solution.
-        self._apply_k8s_resources(force_conflicts=True)
+        try:
+            self._apply_k8s_resources(force_conflicts=True)
+        except ErrorWithStatus as err:
+            self.model.unit.status = err.status
+            self.logger.info(f"Failed to handle {event} with error: {str(err)}")
+            return
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
