@@ -5,8 +5,6 @@
 #    pip-compile requirements-unit.in
 #
 anyio==3.7.1
-    # via httpcore
-certifi==2023.7.22
     # via
     #   -r requirements.txt
     #   httpcore
