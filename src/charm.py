@@ -5,6 +5,7 @@
 
 """A Juju Charm for Seldon Core Operator."""
 
+import json
 import logging
 import tempfile
 from base64 import b64encode
@@ -44,22 +45,10 @@ CONFIGMAP_RESOURCE_FILES = [
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 CONTAINER_CERTS_DEST = "/tmp/k8s-webhook-server/serving-certs/"
 
-DEFAULT_IMAGES = {
-    "configmap__predictor__tensorflow__tensorflow": "tensorflow/serving:2.1.0",
-    "configmap__predictor__tensorflow__seldon": "seldonio/tfserving-proxy:1.15.0",
-    "configmap__predictor__sklearn__seldon": "docker.io/charmedkubeflow/sklearnserver:v1.16.0_20.04_1",  # noqa: E501
-    "configmap__predictor__sklearn__v2": "docker.io/charmedkubeflow/mlserver-sklearn:1.2.0_22.04_1",
-    "configmap__predictor__xgboost__seldon": "seldonio/xgboostserver:1.15.0",
-    "configmap__predictor__xgboost__v2": "docker.io/charmedkubeflow/mlserver-xgboost:1.2.0_22.04_1",
-    "configmap__predictor__mlflow__seldon": "seldonio/mlflowserver:1.15.0",
-    "configmap__predictor__mlflow__v2": "docker.io/charmedkubeflow/mlserver-mlflow:1.2.0_22.04_1",
-    "configmap__predictor__triton__v2": "nvcr.io/nvidia/tritonserver:21.08-py3",
-    "configmap__predictor__huggingface__v2": "docker.io/charmedkubeflow/mlserver-huggingface:1.2.4_22.04_1",  # noqa: E501
-    "configmap__predictor__tempo_server__v2": "seldonio/mlserver:1.2.0-slim",
-    "configmap_storageInitializer": "seldonio/rclone-storage-initializer:1.14.1",
-    "configmap_explainer": "seldonio/alibiexplainer:1.15.0",
-    "configmap_explainer_v2": "seldonio/mlserver:1.2.0-alibi-explain",
-}
+DEFAULT_IMAGES_FILE = "src/default-custom-images.json"
+
+with open(DEFAULT_IMAGES_FILE, "r") as json_file:
+    DEFAULT_IMAGES = json.load(json_file)
 
 
 def parse_images_config(config: str):
@@ -67,7 +56,7 @@ def parse_images_config(config: str):
     Parse a YAML config-defined images list.
 
     This function takes a YAML-formatted string 'config' containing a list of images
-    and returns a dictionaryrepresenting the images.
+    and returns a dictionary representing the images.
 
     Args:
         config (str): YAML-formatted string representing a list of images.
@@ -464,6 +453,7 @@ class SeldonCoreOperator(CharmBase):
             self.model.unit.status = err.status
             self.logger.info(f"Failed to handle {event} with error: {str(err)}")
             return
+        self.model.unit.status = ActiveStatus()
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
