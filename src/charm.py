@@ -413,7 +413,7 @@ class SeldonCoreOperator(CharmBase):
                 raise GenericCharmRuntimeError("ConfigMap resources creation failed") from error
         self.model.unit.status = MaintenanceStatus("K8S resources created")
 
-    def _on_install(self, event):
+    def _on_install(self, _):
         """Installation only tasks."""
         # deploy K8S resources to speed up deployment
         # TODO: force_conflicts=True to work around issue
