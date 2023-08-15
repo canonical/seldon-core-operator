@@ -67,6 +67,18 @@ Please see the [official docs site](https://charmed-kubeflow.io/docs) for comple
 If you find a bug in our operator or want to request a specific feature, please file a bug here: 
 [https://github.com/canonical/seldon-core-operator/issues](https://github.com/canonical/seldon-core-operator/issues)
 
+### Setting Custom Images for Knative Serving
+
+Seldon deploys with a set of preconfigured images.  These images, listed in the `src/default-custom-images.json`, can be overridden using the charm config `custom_images`.
+
+For example:
+
+images_to_override.yaml
+```yaml
+configmap_explainer: 'my.repo/explainer:latest'
+configmap_explainer_v2: 'my.repo/explainer_v2:v1.2.3'
+```
+
 
 ### License
 Charmed Kubeflow is free software, distributed under the [Apache Software License, version 2.0](https://github.com/canonical/seldon-core-operator/blob/master/LICENSE).

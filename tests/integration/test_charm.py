@@ -71,7 +71,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_configmap_created(lightkube_client: Client, ops_test: OpsTest):
-    """Test configmaps contents with default coonfig."""
+    """Test configmaps contents with default config."""
     seldon_config_cm = lightkube_client.get(
         ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
     )
@@ -106,7 +106,7 @@ async def test_blocked_on_invalid_config(ops_test: OpsTest):
 
 
 @pytest.mark.abort_on_fail
-async def test_back_to_active_on_config(lightkube_client: Client, ops_test: OpsTest):
+async def test_back_to_active_on_default_config(lightkube_client: Client, ops_test: OpsTest):
     await ops_test.model.applications[APP_NAME].set_config({"custom_images": "{}"})
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300

@@ -11,7 +11,6 @@ import tempfile
 from base64 import b64encode
 from pathlib import Path
 from subprocess import DEVNULL, check_call
-from typing import Dict
 
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
@@ -31,6 +30,8 @@ from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Container, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer, ProtocolError
 
+from image_management import parse_image_config, remove_empty_images, update_images
+
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
     "src/templates/validate.yaml.j2",
@@ -45,36 +46,26 @@ CONFIGMAP_RESOURCE_FILES = [
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 CONTAINER_CERTS_DEST = "/tmp/k8s-webhook-server/serving-certs/"
 
+CUSTOM_IMAGE_CONFIG_NAME = "custom_images"
+
+# This list needs to be in-sync with src/templates/configmap.yaml.j2
+SPLIT_IMAGES_LIST = [
+    "configmap__predictor__tensorflow__tensorflow",
+    "configmap__predictor__tensorflow__seldon",
+    "configmap__predictor__sklearn__seldon",
+    "configmap__predictor__sklearn__v2",
+    "configmap__predictor__xgboost__seldon",
+    "configmap__predictor__xgboost__v2",
+    "configmap__predictor__mlflow__seldon",
+    "configmap__predictor__mlflow__v2",
+    "configmap__predictor__triton__v2",
+    "configmap__predictor__huggingface__v2",
+    "configmap__predictor__tempo_server__v2",
+]
 DEFAULT_IMAGES_FILE = "src/default-custom-images.json"
 
 with open(DEFAULT_IMAGES_FILE, "r") as json_file:
     DEFAULT_IMAGES = json.load(json_file)
-
-
-def parse_images_config(config: str):
-    """
-    Parse a YAML config-defined images list.
-
-    This function takes a YAML-formatted string 'config' containing a list of images
-    and returns a dictionary representing the images.
-
-    Args:
-        config (str): YAML-formatted string representing a list of images.
-
-    Returns:
-        Dict: A list of images.
-    """
-    error_message = (
-        f"Cannot parse a config-defined images list from config '{config}' - this "
-        "config input will be ignored."
-    )
-    if not config:
-        return []
-    try:
-        images = yaml.safe_load(config)
-    except yaml.YAMLError:
-        raise ErrorWithStatus(error_message, BlockedStatus)
-    return images
 
 
 class SeldonCoreOperator(CharmBase):
@@ -87,8 +78,6 @@ class SeldonCoreOperator(CharmBase):
         super().__init__(*args)
 
         # retrieve configuration and base settings
-        self.custom_images = []
-        self.images_context = {}
         self.logger = logging.getLogger(__name__)
         self._gateway = GatewayRequirer(self)
         self._namespace = self.model.name
@@ -198,14 +187,11 @@ class SeldonCoreOperator(CharmBase):
     @property
     def configmap_resource_handler(self):
         """Update K8S with ConfigMap resources."""
-        self.custom_images = parse_images_config(self.model.config["custom_images"])
-        self.images_context = self.get_images(DEFAULT_IMAGES, self.custom_images)
-
         if not self._configmap_resource_handler:
             self._configmap_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
                 template_files=CONFIGMAP_RESOURCE_FILES,
-                context={**self._context, **self.images_context},
+                context={**self._context, **self._configmap_images},
                 logger=self.logger,
             )
         load_in_cluster_generic_resources(self._configmap_resource_handler.lightkube_client)
@@ -290,51 +276,37 @@ class SeldonCoreOperator(CharmBase):
 
         return Layer(layer_config)
 
-    def get_images(
-        self, default_images: Dict[str, str], custom_images: Dict[str, str]
-    ) -> Dict[str, str]:
-        """
-        Combine default images with custom images.
+    @property
+    def _configmap_images(self):
+        return self._get_custom_images()
 
-        This function takes two dictionaries, 'default_images' and 'custom_images',
-        representing the default set of images and the custom set of images respectively.
-        It combines the custom images into the default image list, overriding any matching
-        image names from the default list with the custom ones.
-        Args:
-            default_images (Dict[str, str]): A dictionary containing the default image names
-                as keys and their corresponding default image URIs as values.
-            custom_images (Dict[str, str]): A dictionary containing the custom image names
-                as keys and their corresponding custom image URIs as values.
-        Returns:
-            Dict[str, str]: A dictionary representing the combined images, where image names
-            from the custom_images override any matching image names from the default_images.
-        """
-        images = default_images
-        for image_name, custom_image in custom_images.items():
-            if custom_image:
-                if image_name in images:
-                    images[image_name] = custom_image
-                else:
-                    self.logger.warning(f"image_name {image_name} not in image list, ignoring.")
+    def _get_custom_images(self):
+        """Parse custom_images from config and defaults, returning a dict of images."""
+        try:
+            default_images = remove_empty_images(DEFAULT_IMAGES)
+            custom_images = parse_image_config(self.model.config[CUSTOM_IMAGE_CONFIG_NAME])
+            custom_images = update_images(
+                default_images=default_images, custom_images=custom_images
+            )
 
-        # This are special cases comfigmap where they need to be split into image and version
-        for image_name in [
-            "configmap__predictor__tensorflow__tensorflow",
-            "configmap__predictor__tensorflow__seldon",
-            "configmap__predictor__sklearn__seldon",
-            "configmap__predictor__sklearn__v2",
-            "configmap__predictor__xgboost__seldon",
-            "configmap__predictor__xgboost__v2",
-            "configmap__predictor__mlflow__seldon",
-            "configmap__predictor__mlflow__v2",
-            "configmap__predictor__triton__v2",
-            "configmap__predictor__huggingface__v2",
-            "configmap__predictor__tempo_server__v2",
-        ]:
-            images[f"{image_name}__image"], images[f"{image_name}__version"] = images[
-                image_name
-            ].split(":")
-        return images
+            # This are special cases comfigmap where they need to be split into image and version
+            for image_name in SPLIT_IMAGES_LIST:
+                (
+                    custom_images[f"{image_name}__image"],
+                    custom_images[f"{image_name}__version"],
+                ) = custom_images[image_name].split(":")
+
+        except yaml.YAMLError as err:
+            self.logger.error(
+                f"Charm Blocked due to error parsing the `custom_images` config.  "
+                f"Caught error: {str(err)}"
+            )
+            raise ErrorWithStatus(
+                "Error parsing the `custom_images` config - fix `custom_images` to unblock.  "
+                "See logs for more details",
+                BlockedStatus,
+            )
+        return custom_images
 
     def _check_leader(self):
         """Check if this unit is a leader."""
