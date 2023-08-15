@@ -419,12 +419,7 @@ class SeldonCoreOperator(CharmBase):
         # TODO: force_conflicts=True to work around issue
         #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
         #  a better solution.
-        try:
-            self._apply_k8s_resources(force_conflicts=True)
-        except ErrorWithStatus as err:
-            self.model.unit.status = err.status
-            self.logger.info(f"Failed to handle {event} with error: {str(err)}")
-            return
+        self._apply_k8s_resources(force_conflicts=True)
         self.model.unit.status = ActiveStatus()
 
     def _on_pebble_ready(self, event):
