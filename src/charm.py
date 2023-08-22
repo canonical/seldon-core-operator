@@ -11,6 +11,7 @@ import tempfile
 from base64 import b64encode
 from pathlib import Path
 from subprocess import DEVNULL, check_call
+from typing import Dict
 
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
@@ -277,11 +278,26 @@ class SeldonCoreOperator(CharmBase):
         return Layer(layer_config)
 
     @property
-    def _configmap_images(self):
+    def _configmap_images(self) -> Dict[str, str]:
+        """
+        Property getter method that retrieves custom images from configuration.
+
+        Returns:
+            Dict[str, str]: Custom image names and their corresponding image URLs.
+
+        """
         return self._get_custom_images()
 
-    def _get_custom_images(self):
-        """Parse custom_images from config and defaults, returning a dict of images."""
+    def _get_custom_images(self) -> Dict[str, str]:
+        """
+        Parse custom_images from config and defaults, returning a dictionary of images.
+
+        Returns:
+            Dict[str, str]: Custom image names and their corresponding image URLs.
+
+        Raises:
+            ErrorWithStatus: Error occurred during the parsing process.
+        """
         try:
             default_images = remove_empty_images(DEFAULT_IMAGES)
             custom_images = parse_image_config(self.model.config[CUSTOM_IMAGE_CONFIG_NAME])

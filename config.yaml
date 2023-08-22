@@ -8,6 +8,10 @@ options:
     default: '4443'
     description: Webhook server port
   custom_images:
+    description: >
+      YAML or JSON formatted input defining images to use in Seldon Code.  Any image omitted or set to '' here will
+      use a default image.  For usage details, see 
+      https://github.com/canonical/seldon-core-operator/blob/main/README.md#setting-custom-images-for-seldon-core.
     type: string
     default: |
       configmap__predictor__tensorflow__tensorflow: ''

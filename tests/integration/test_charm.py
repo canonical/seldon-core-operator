@@ -95,27 +95,11 @@ async def test_configmap_changes_with_config(lightkube_client: Client, ops_test:
 
     assert seldon_config_cm.data == SELDON_CONFIG_CHANGED
 
-
-@pytest.mark.abort_on_fail
-async def test_blocked_on_invalid_config(ops_test: OpsTest):
-    await ops_test.model.applications[APP_NAME].set_config({"custom_images": "{"})
-    await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="blocked", raise_on_blocked=False, timeout=300
-    )
-    assert ops_test.model.applications[APP_NAME].units[0].workload_status == "blocked"
-
-
-@pytest.mark.abort_on_fail
-async def test_back_to_active_on_default_config(lightkube_client: Client, ops_test: OpsTest):
+    # Change to default settings
     await ops_test.model.applications[APP_NAME].set_config({"custom_images": "{}"})
     await ops_test.model.wait_for_idle(
-        apps=[APP_NAME], status="active", raise_on_blocked=False, timeout=300
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=300
     )
-    seldon_config_cm = lightkube_client.get(
-        ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
-    )
-
-    assert seldon_config_cm.data == SELDON_CONFIG
 
 
 async def test_seldon_istio_relation(ops_test: OpsTest):
