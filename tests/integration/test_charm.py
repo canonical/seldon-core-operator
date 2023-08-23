@@ -33,6 +33,19 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     plural="seldondeployments",
     verbs=None,
 )
+SELDON_CM_NAME = "seldon-config"
+
+with open("tests/integration/test_data/expected_seldon_cm.json", "r") as json_file:
+    SELDON_CONFIG = json.load(json_file)
+
+with open("tests/integration/test_data/expected_changed_seldon_cm.json", "r") as json_file:
+    SELDON_CONFIG_CHANGED = json.load(json_file)
+
+
+@pytest.fixture(scope="session")
+def lightkube_client() -> Client:
+    client = Client(field_manager=APP_NAME)
+    return client
 
 
 @pytest.mark.abort_on_fail
@@ -54,6 +67,39 @@ async def test_build_and_deploy(ops_test: OpsTest):
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=60 * 10, idle_period=30
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
+
+
+@pytest.mark.abort_on_fail
+async def test_configmap_created(lightkube_client: Client, ops_test: OpsTest):
+    """Test configmaps contents with default config."""
+    seldon_config_cm = lightkube_client.get(
+        ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
+    )
+
+    assert seldon_config_cm.data == SELDON_CONFIG
+
+
+@pytest.mark.abort_on_fail
+async def test_configmap_changes_with_config(lightkube_client: Client, ops_test: OpsTest):
+    await ops_test.model.applications[APP_NAME].set_config(
+        {
+            "custom_images": '{"configmap__predictor__sklearn__v2": "custom:1.0", "configmap_explainer": "custom:2.0"}'  # noqa: E501
+        }
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=300
+    )
+    seldon_config_cm = lightkube_client.get(
+        ConfigMap, SELDON_CM_NAME, namespace=ops_test.model_name
+    )
+
+    assert seldon_config_cm.data == SELDON_CONFIG_CHANGED
+
+    # Change to default settings
+    await ops_test.model.applications[APP_NAME].set_config({"custom_images": "{}"})
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=300
+    )
 
 
 async def test_seldon_istio_relation(ops_test: OpsTest):
