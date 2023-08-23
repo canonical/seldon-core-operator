@@ -9,10 +9,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Harness
 
 from charm import SeldonCoreOperator
+
+SELDON_CM_NAME = "seldon-config"
+
+with open("tests/unit/test_data/custom_images_list.json", "r") as json_file:
+    SELDON_CONFIG = json.load(json_file)
 
 
 @pytest.fixture(scope="function")
@@ -255,3 +261,42 @@ class TestCharm:
         istio_gateway = harness.charm._get_istio_gateway()
         assert istio_gateway is not None
         assert istio_gateway == test_model_name + "/" + test_gateway
+
+    @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
+    @pytest.mark.parametrize(
+        "custom_image_config, expected_custom_images",
+        [
+            (
+                yaml.dump({"name1": "image1", "name2": "image2"}),
+                {**{"name1": "image1", "name2": "image2"}, **SELDON_CONFIG},
+            ),
+            (
+                yaml.dump({}),
+                SELDON_CONFIG,
+            ),
+        ],
+    )
+    def test_custom_images_config_context(
+        self, custom_image_config, expected_custom_images, harness
+    ):
+        """Asserts that the custom_images context is as expected.
+        Note: This test is trivial now, where custom_image_config always equals custom_images, but
+        once we've implemented rocks for this charm those will be used as the defaults and this test
+        will be more helpful.
+        """
+        harness.update_config({"custom_images": custom_image_config})
+        harness.begin()
+
+        actual_custom_images = harness.charm._configmap_images
+
+        assert actual_custom_images == expected_custom_images
+
+    @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
+    def test_custom_images_config_context_with_incorrect_config(self, harness: Harness):
+        """Asserts that the custom_images context correctly raises on corrupted config input."""
+        harness.update_config({"custom_images": "{"})
+        harness.begin()
+
+        with pytest.raises(ErrorWithStatus) as err:
+            harness.charm._configmap_images
+            assert isinstance(err.status, BlockedStatus)
