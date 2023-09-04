@@ -309,7 +309,7 @@ class SeldonCoreOperator(CharmBase):
                 (
                     custom_images[f"{image_name}__image"],
                     custom_images[f"{image_name}__version"],
-                ) = custom_images[image_name].split(":")
+                ) = custom_images[image_name].rsplit(":", 1)
 
         except yaml.YAMLError as err:
             self.logger.error(
