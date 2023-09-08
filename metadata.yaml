@@ -5,6 +5,7 @@ summary: Blazing Fast, Industry-Ready ML
 description: |
   An open source platform to deploy your machine learning models
   on Kubernetes at massive scale.
+docs: https://discourse.charmhub.io/t/8238
 website: https://charmhub.io/seldon-core
 source: https://github.com/canonical/seldon-core-operator
 issues: https://github.com/canonical/seldon-core-operator/issues
@@ -16,7 +17,7 @@ resources:
     type: oci-image
     description: 'Backing OCI image'
     auto-fetch: true
-    upstream-source: 'docker.io/charmedkubeflow/seldon-core-operator:v1.15.0_22.04_1'
+    upstream-source: 'docker.io/seldonio/seldon-core-operator:1.17.1'
 requires:
   ambassador:
     interface: service-mesh
