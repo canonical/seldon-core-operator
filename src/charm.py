@@ -5,12 +5,15 @@
 
 """A Juju Charm for Seldon Core Operator."""
 
+import json
 import logging
 import tempfile
 from base64 import b64encode
 from pathlib import Path
 from subprocess import DEVNULL, check_call
+from typing import Dict
 
+import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus, GenericCharmRuntimeError
 from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
@@ -24,8 +27,10 @@ from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import EventBase, StoredState
 from ops.main import main
-from ops.model import ActiveStatus, Container, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, Container, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer, ProtocolError
+
+from image_management import parse_image_config, remove_empty_images, update_images
 
 K8S_RESOURCE_FILES = [
     "src/templates/auth_manifests.yaml.j2",
@@ -40,6 +45,27 @@ CONFIGMAP_RESOURCE_FILES = [
 ]
 SSL_CONFIG_FILE = "src/templates/ssl.conf.j2"
 CONTAINER_CERTS_DEST = "/tmp/k8s-webhook-server/serving-certs/"
+
+CUSTOM_IMAGE_CONFIG_NAME = "custom_images"
+
+# This list needs to be in-sync with src/templates/configmap.yaml.j2
+SPLIT_IMAGES_LIST = [
+    "configmap__predictor__tensorflow__tensorflow",
+    "configmap__predictor__tensorflow__seldon",
+    "configmap__predictor__sklearn__seldon",
+    "configmap__predictor__sklearn__v2",
+    "configmap__predictor__xgboost__seldon",
+    "configmap__predictor__xgboost__v2",
+    "configmap__predictor__mlflow__seldon",
+    "configmap__predictor__mlflow__v2",
+    "configmap__predictor__triton__v2",
+    "configmap__predictor__huggingface__v2",
+    "configmap__predictor__tempo_server__v2",
+]
+DEFAULT_IMAGES_FILE = "src/default-custom-images.json"
+
+with open(DEFAULT_IMAGES_FILE, "r") as json_file:
+    DEFAULT_IMAGES = json.load(json_file)
 
 
 class SeldonCoreOperator(CharmBase):
@@ -165,7 +191,7 @@ class SeldonCoreOperator(CharmBase):
             self._configmap_resource_handler = KubernetesResourceHandler(
                 field_manager=self._lightkube_field_manager,
                 template_files=CONFIGMAP_RESOURCE_FILES,
-                context=self._context,
+                context={**self._context, **self._configmap_images},
                 logger=self.logger,
             )
         load_in_cluster_generic_resources(self._configmap_resource_handler.lightkube_client)
@@ -249,6 +275,53 @@ class SeldonCoreOperator(CharmBase):
         }
 
         return Layer(layer_config)
+
+    @property
+    def _configmap_images(self) -> Dict[str, str]:
+        """
+        Property getter method that retrieves custom images from configuration.
+
+        Returns:
+            Dict[str, str]: Custom image names and their corresponding image URLs.
+
+        """
+        return self._get_custom_images()
+
+    def _get_custom_images(self) -> Dict[str, str]:
+        """
+        Parse custom_images from config and defaults, returning a dictionary of images.
+
+        Returns:
+            Dict[str, str]: Custom image names and their corresponding image URLs.
+
+        Raises:
+            ErrorWithStatus: Error occurred during the parsing process.
+        """
+        try:
+            default_images = remove_empty_images(DEFAULT_IMAGES)
+            custom_images = parse_image_config(self.model.config[CUSTOM_IMAGE_CONFIG_NAME])
+            custom_images = update_images(
+                default_images=default_images, custom_images=custom_images
+            )
+
+            # This are special cases comfigmap where they need to be split into image and version
+            for image_name in SPLIT_IMAGES_LIST:
+                (
+                    custom_images[f"{image_name}__image"],
+                    custom_images[f"{image_name}__version"],
+                ) = custom_images[image_name].rsplit(":", 1)
+
+        except yaml.YAMLError as err:
+            self.logger.error(
+                f"Charm Blocked due to error parsing the `custom_images` config.  "
+                f"Caught error: {str(err)}"
+            )
+            raise ErrorWithStatus(
+                "Error parsing the `custom_images` config - fix `custom_images` to unblock.  "
+                "See logs for more details",
+                BlockedStatus,
+            )
+        return custom_images
 
     def _check_leader(self):
         """Check if this unit is a leader."""
@@ -362,6 +435,7 @@ class SeldonCoreOperator(CharmBase):
         #  https://github.com/canonical/seldon-core-operator/issues/147.  Remove this when we have
         #  a better solution.
         self._apply_k8s_resources(force_conflicts=True)
+        self.model.unit.status = ActiveStatus()
 
     def _on_pebble_ready(self, event):
         """Configure started container."""
