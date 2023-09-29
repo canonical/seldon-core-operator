@@ -87,7 +87,10 @@ class SeldonCoreOperator(CharmBase):
         self._metrics_port = self.model.config["metrics-port"]
         self._webhook_port = self.model.config["webhook-port"]
         self._exec_command = (
-            "/manager " "--enable-leader-election " f"--webhook-port {self._webhook_port} "
+            "/manager "
+            "--enable-leader-election "
+            f"--metrics-addr=:{self._metrics_port} "
+            f"--webhook-port {self._webhook_port} "
         )
         self._container_name = "seldon-core"
         self._container = self.unit.get_container(self._container_name)
