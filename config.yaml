@@ -42,7 +42,7 @@ options:
     description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
   executor-container-image-and-version:
     type: string
-    default: 'docker.io/seldonio/seldon-core-executor:1.14.0'
+    default: 'docker.io/seldonio/seldon-core-executor:1.17.1'
     description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
   executor-container-image-pull-policy:
     type: string
