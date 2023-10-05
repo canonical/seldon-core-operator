@@ -34,7 +34,7 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     verbs=None,
 )
 SELDON_CM_NAME = "seldon-config"
-DEFAULT_NAMESPACE = "default"
+WORKLOADS_NAMESPACE = "default"
 
 with open("tests/integration/test_data/expected_seldon_cm.json", "r") as json_file:
     SELDON_CONFIG = json.load(json_file)
@@ -171,7 +171,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
     # Use namespace "default" to create seldon deployments
     # due to https://github.com/canonical/seldon-core-operator/issues/218
-    namespace = DEFAULT_NAMESPACE
+    namespace = WORKLOADS_NAMESPACE
     client = Client()
 
     # setup Prometheus
@@ -284,7 +284,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
     # Use namespace "default" to create seldon deployments
     # due to https://github.com/canonical/seldon-core-operator/issues/218
-    namespace = DEFAULT_NAMESPACE
+    namespace = WORKLOADS_NAMESPACE
     client = Client()
 
     this_ns = client.get(res=Namespace, name=namespace)
