@@ -34,6 +34,7 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     verbs=None,
 )
 SELDON_CM_NAME = "seldon-config"
+DEFAULT_NAMESPACE = "default"
 
 with open("tests/integration/test_data/expected_seldon_cm.json", "r") as json_file:
     SELDON_CONFIG = json.load(json_file)
@@ -102,6 +103,7 @@ async def test_configmap_changes_with_config(lightkube_client: Client, ops_test:
     )
 
 
+@pytest.mark.abort_on_fail
 async def test_seldon_istio_relation(ops_test: OpsTest):
     """Test Seldon/Istio relation."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
@@ -162,11 +164,14 @@ async def check_alert_propagation(url, alert_name):
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
 
+@pytest.mark.abort_on_fail
 @pytest.mark.asyncio
 async def test_seldon_alert_rules(ops_test: OpsTest):
     """Test Seldon alert rules."""
     # NOTE: This test is re-using deployments created in test_build_and_deploy()
-    namespace = ops_test.model_name
+    # Use namespace "default" to create seldon deployments
+    # due to https://github.com/canonical/seldon-core-operator/issues/218
+    namespace = DEFAULT_NAMESPACE
     client = Client()
 
     # setup Prometheus
@@ -277,7 +282,9 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 async def test_seldon_deployment(ops_test: OpsTest):
     """Test Seldon Deployment scenario."""
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
-    namespace = ops_test.model_name
+    # Use namespace "default" to create seldon deployments
+    # due to https://github.com/canonical/seldon-core-operator/issues/218
+    namespace = DEFAULT_NAMESPACE
     client = Client()
 
     this_ns = client.get(res=Namespace, name=namespace)
