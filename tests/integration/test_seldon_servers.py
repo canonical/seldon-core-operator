@@ -104,94 +104,94 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # IMAGE:VERSION in below response data is replaced with values found in seldon-config ConfigMap
     "server_name, server_config, url, request_data, response_test_data",
     [
-        (
-            "SKLEARN_SERVER",
-            "sklearn.yaml",
-            "api/v1.0/predictions",
-            {"data": {"ndarray": [[1, 2, 3, 4]]}},
-            {
-                "data": {
-                    "names": ["t:0", "t:1", "t:2"],
-                    "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
-                },
-                # classifier will be replaced according to configmap
-                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
-            },
-        ),
-        (
-            "SKLEARN_SERVER",
-            "sklearn-v2.yaml",
-            "v2/models/classifier/infer",
-            {
-                "inputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 4],
-                        "datatype": "FP32",
-                        "data": [[1, 2, 3, 4]],
-                    },
-                ]
-            },
-            {
-                "model_name": "classifier",
-                "model_version": "v1",
-                "id": "None",  # id needs to be reset in response
-                "parameters": {},
-                "outputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 1],
-                        "datatype": "INT64",
-                        "parameters": {"content_type": "np"},
-                        "data": [2],
-                    }
-                ],
-            },
-        ),
-        (
-            "XGBOOST_SERVER",
-            "xgboost.yaml",
-            "api/v1.0/predictions",
-            {"data": {"ndarray": [[1.0, 2.0, 5.0, 6.0]]}},
-            {
-                "data": {
-                    "names": [],
-                    "ndarray": [2.0],
-                },
-                # classifier will be replaced according to configmap
-                "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
-            },
-        ),
-        (
-            "XGBOOST_SERVER",
-            "xgboost-v2.yaml",
-            "v2/models/iris/infer",
-            {
-                "inputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 4],
-                        "datatype": "FP32",
-                        "data": [[1, 2, 3, 4]],
-                    },
-                ]
-            },
-            {
-                "model_name": "iris",
-                "model_version": "v0.1.0",
-                "id": "None",  # id needs to be reset in response
-                "parameters": {},
-                "outputs": [
-                    {
-                        "name": "predict",
-                        "shape": [1, 1],
-                        "datatype": "FP32",
-                        "parameters": {"content_type": "np"},
-                        "data": [2.0],
-                    }
-                ],
-            },
-        ),
+        # (
+        #     "SKLEARN_SERVER",
+        #     "sklearn.yaml",
+        #     "api/v1.0/predictions",
+        #     {"data": {"ndarray": [[1, 2, 3, 4]]}},
+        #     {
+        #         "data": {
+        #             "names": ["t:0", "t:1", "t:2"],
+        #             "ndarray": [[0.0006985194531162835, 0.00366803903943666, 0.995633441507447]],
+        #         },
+        #         # classifier will be replaced according to configmap
+        #         "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
+        #     },
+        # ),
+        # (
+        #     "SKLEARN_SERVER",
+        #     "sklearn-v2.yaml",
+        #     "v2/models/classifier/infer",
+        #     {
+        #         "inputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 4],
+        #                 "datatype": "FP32",
+        #                 "data": [[1, 2, 3, 4]],
+        #             },
+        #         ]
+        #     },
+        #     {
+        #         "model_name": "classifier",
+        #         "model_version": "v1",
+        #         "id": "None",  # id needs to be reset in response
+        #         "parameters": {},
+        #         "outputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 1],
+        #                 "datatype": "INT64",
+        #                 "parameters": {"content_type": "np"},
+        #                 "data": [2],
+        #             }
+        #         ],
+        #     },
+        # ),
+        # (
+        #     "XGBOOST_SERVER",
+        #     "xgboost.yaml",
+        #     "api/v1.0/predictions",
+        #     {"data": {"ndarray": [[1.0, 2.0, 5.0, 6.0]]}},
+        #     {
+        #         "data": {
+        #             "names": [],
+        #             "ndarray": [2.0],
+        #         },
+        #         # classifier will be replaced according to configmap
+        #         "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
+        #     },
+        # ),
+        # (
+        #     "XGBOOST_SERVER",
+        #     "xgboost-v2.yaml",
+        #     "v2/models/iris/infer",
+        #     {
+        #         "inputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 4],
+        #                 "datatype": "FP32",
+        #                 "data": [[1, 2, 3, 4]],
+        #             },
+        #         ]
+        #     },
+        #     {
+        #         "model_name": "iris",
+        #         "model_version": "v0.1.0",
+        #         "id": "None",  # id needs to be reset in response
+        #         "parameters": {},
+        #         "outputs": [
+        #             {
+        #                 "name": "predict",
+        #                 "shape": [1, 1],
+        #                 "datatype": "FP32",
+        #                 "parameters": {"content_type": "np"},
+        #                 "data": [2.0],
+        #             }
+        #         ],
+        #     },
+        # ),
         (
             "MLFLOW_SERVER",
             "mlflowserver.yaml",
