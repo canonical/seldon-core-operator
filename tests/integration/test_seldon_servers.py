@@ -251,7 +251,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
                         "name": "output",
                         "shape": [1, 1],
                         "datatype": "BYTES",
-                        "parameters": {"content_type": "str"},
+                        "parameters": {"content_type": "hg_jsonlist"},
                         # 'data' needs to be reset because GPT returns different results every time
                         "data": "None",
                     }
