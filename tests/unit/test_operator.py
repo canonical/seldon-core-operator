@@ -181,6 +181,7 @@ class TestCharm:
         assert (
             pebble_plan_info["services"]["seldon-core"]["command"] == "/manager "
             "--enable-leader-election "
+            f"--metrics-addr=:{harness.charm._metrics_port} "
             f"--webhook-port {harness.charm._webhook_port} "
         )
         test_env = pebble_plan_info["services"]["seldon-core"]["environment"]
