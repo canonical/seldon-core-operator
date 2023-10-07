@@ -181,15 +181,14 @@ class TestCharm:
         assert (
             pebble_plan_info["services"]["seldon-core"]["command"] == "/manager "
             "--enable-leader-election "
-            f"--create-resources=:{harness.charm._manager_create_resources} "
             f"--metrics-addr=:{harness.charm._metrics_port} "
             f"--webhook-port {harness.charm._webhook_port} "
-            f"--log-level=:{harness.charm._manager_log_level} "
-            f"--leader-election-id=:{harness.charm._manager_leader_election_id} "
-            f"--leader-election-resource-lock=:{harness.charm._manager_leader_election_resource_lock} "
-            f"--leader-election-lease-duration-secs=:{harness.charm._manager_leader_election_lease_duration_secs} "
-            f"--leader-election-renew-deadline-secs=:{harness.charm._manager_leader_election_renew_deadline_secs} "
-            f"--leader-election-retry-period-secs=:{harness.charm._manager_leader_election_retry_period_secs}"
+            f"--log-level={harness.charm._manager_log_level} "
+            f"--leader-election-id={harness.charm._manager_leader_election_id} "
+            f"--leader-election-resource-lock={harness.charm._manager_leader_election_resource_lock} "
+            f"--leader-election-lease-duration-secs={harness.charm._manager_leader_election_lease_duration_secs} "
+            f"--leader-election-renew-deadline-secs={harness.charm._manager_leader_election_renew_deadline_secs} "
+            f"--leader-election-retry-period-secs={harness.charm._manager_leader_election_retry_period_secs} "
         )
         test_env = pebble_plan_info["services"]["seldon-core"]["environment"]
         # there should be 36 environment variables
