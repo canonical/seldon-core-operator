@@ -89,10 +89,18 @@ class SeldonCoreOperator(CharmBase):
         self._manager_create_resources = self.model.config["manager-create-resources"]
         self._manager_log_level = self.model.config["manager-log-level"]
         self._manager_leader_election_id = self.model.config["manager-leader-election-id"]
-        self._manager_leader_election_resource_lock = self.model.config["manager-leader-election-resource-lock"]
-        self._manager_leader_election_lease_duration_secs = self.model.config["manager-leader-election-lease-duration-secs"]
-        self._manager_leader_election_renew_deadline_secs = self.model.config["manager-leader-election-renew-deadline-secs"]
-        self._manager_leader_election_retry_period_secs = self.model.config["manager-leader-election-retry-period-secs"]
+        self._manager_leader_election_resource_lock = self.model.config[
+            "manager-leader-election-resource-lock"
+        ]
+        self._manager_leader_election_lease_duration_secs = self.model.config[
+            "manager-leader-election-lease-duration-secs"
+        ]
+        self._manager_leader_election_renew_deadline_secs = self.model.config[
+            "manager-leader-election-renew-deadline-secs"
+        ]
+        self._manager_leader_election_retry_period_secs = self.model.config[
+            "manager-leader-election-retry-period-secs"
+        ]
         self._exec_command = (
             "/manager "
             "--enable-leader-election "
@@ -101,9 +109,9 @@ class SeldonCoreOperator(CharmBase):
             f"--log-level={self._manager_log_level} "
             f"--leader-election-id={self._manager_leader_election_id} "
             f"--leader-election-resource-lock={self._manager_leader_election_resource_lock} "
-            f"--leader-election-lease-duration-secs={self._manager_leader_election_lease_duration_secs} "
-            f"--leader-election-renew-deadline-secs={self._manager_leader_election_renew_deadline_secs} "
-            f"--leader-election-retry-period-secs={self._manager_leader_election_retry_period_secs} "
+            f"--leader-election-lease-duration-secs={self._manager_leader_election_lease_duration_secs} "  # noqa: E501
+            f"--leader-election-renew-deadline-secs={self._manager_leader_election_renew_deadline_secs} "  # noqa: E501
+            f"--leader-election-retry-period-secs={self._manager_leader_election_retry_period_secs} "  # noqa: E501
         )
         self._container_name = "seldon-core"
         self._container = self.unit.get_container(self._container_name)
@@ -248,8 +256,12 @@ class SeldonCoreOperator(CharmBase):
             "EXECUTOR_REQUEST_LOGGER_DEFAULT_ENDPOINT": config[
                 "executor-request-logger-default-endpoint"
             ],
-            "EXECUTOR_REQUEST_LOGGER_WORK_QUEUE_SIZE": config["executor-request-logger-work-queue-size"],
-            "EXECUTOR_REQUEST_LOGGER_WRITE_TIMEOUT_MS": config["executor-request-logger-write-timeout-ms"],
+            "EXECUTOR_REQUEST_LOGGER_WORK_QUEUE_SIZE": config[
+                "executor-request-logger-work-queue-size"
+            ],
+            "EXECUTOR_REQUEST_LOGGER_WRITE_TIMEOUT_MS": config[
+                "executor-request-logger-write-timeout-ms"
+            ],
             "EXECUTOR_SERVER_METRICS_PORT_NAME": config["executor-server-metrics-port-name"],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
             "ISTIO_ENABLED": str(bool(self.model.relations["gateway-info"])).lower(),
@@ -259,10 +271,18 @@ class SeldonCoreOperator(CharmBase):
             "MANAGER_CREATE_RESOURCES": str(config["manager-create-resources"]).lower(),
             "MANAGER_LOG_LEVEL": config["manager-log-level"],
             "MANAGER_LEADER_ELECTION_ID": config["manager-leader-election-id"],
-            "MANAGER_LEADER_ELECTION_RESOURCE_LOCK": config["manager-leader-election-resource-lock"],
-            "MANAGER_LEADER_ELECTION_LEASE_DURATION_SECS": config["manager-leader-election-lease-duration-secs"],
-            "MANAGER_LEADER_ELECTION_RENEW_DEADLINE_SECS": config["manager-leader-election-renew-deadline-secs"],
-            "MANAGER_LEADER_ELECTION_RETRY_PERIOD_SECS": config["manager-leader-election-retry-period-secs"],
+            "MANAGER_LEADER_ELECTION_RESOURCE_LOCK": config[
+                "manager-leader-election-resource-lock"
+            ],
+            "MANAGER_LEADER_ELECTION_LEASE_DURATION_SECS": config[
+                "manager-leader-election-lease-duration-secs"
+            ],
+            "MANAGER_LEADER_ELECTION_RENEW_DEADLINE_SECS": config[
+                "manager-leader-election-renew-deadline-secs"
+            ],
+            "MANAGER_LEADER_ELECTION_RETRY_PERIOD_SECS": config[
+                "manager-leader-election-retry-period-secs"
+            ],
             "POD_NAMESPACE": self.model.name,
             "PREDICTIVE_UNIT_DEFAULT_ENV_SECRET_REF_NAME": config[
                 "predictive-unit-default-env-secret-ref-name"
