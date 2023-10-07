@@ -31,124 +31,192 @@ options:
   ambassador-single-namespace:
     type: boolean
     default: false
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  ambassador-version:
+    type: string
+    default: 'v2'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   controller-id:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   default-user-id:
     type: string
     default: '8888'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  deployment-name-as-prefix:
+    type: boolean
+    default: false
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-container-image-and-version:
     type: string
     default: 'docker.io/seldonio/seldon-core-executor:1.17.1'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-container-image-pull-policy:
     type: string
     default: 'IfNotPresent'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-container-service-account-name:
     type: string
     default: 'default'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-container-user:
     type: string
     default: '8888'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-default-cpu-limit:
     type: string
     default: '0.5'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-default-cpu-request:
     type: string
     default: '0.5'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-default-memory-limit:
     type: string
     default: '512Mi'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-default-memory-request:
     type: string
     default: '512Mi'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  executor-full-health-checks:
+    type: boolean
+    default: false
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-prometheus-path:
     type: string
     default: '/prometheus'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-request-logger-default-endpoint:
     type: string
     default: 'http://default-broker'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  executor-request-logger-work-queue-size:
+    type: string
+    default: '2000'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  executor-request-logger-write-timeout-ms:
+    type: string
+    default: '10000'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-server-metrics-port-name:
     type: string
     default: 'metrics'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   executor-server-port:
     type: string
     default: '8000'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   istio-gateway:
     type: string
     default: 'istio-system/seldon-gateway'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   istio-tls-mode:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-create-resources:
+    type: boolean
+    default: true
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-log-level:
+    type: string
+    default: 'INFO'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-leader-election-id:
+    type: string
+    default: 'a33bd623.machinelearning.seldon.io'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-leader-election-resource-lock:
+    type: string
+    default: ''
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-leader-election-lease-duration-secs:
+    type: string
+    default: '15'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-leader-election-renew-deadline-secs:
+    type: string
+    default: '10'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  manager-leader-election-retry-period-secs:
+    type: string
+    default: '2'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   predictive-unit-default-env-secret-ref-name:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  predictive-unit-grpc-service-port:
+    type: string
+    default: '9500'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  predictive-unit-http-service-port:
+    type: string
+    default: '9000'
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   predictive-unit-metrics-port-name:
     type: string
     default: 'metrics'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
-  predictive-unit-service-port:
-    type: string
-    default: '9000'
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-executor:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-explainer:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  related-image-explainer-v2:
+    type: string
+    default: ''
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-mlflowserver:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  related-image-mlflowserver-v2:
+    type: string
+    default: ''
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-mock-classifier:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-sklearnserver:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  related-image-sklearnserver-v2:
+    type: string
+    default: ''
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-storage-initializer:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-tensorflow:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-tfproxy:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   related-image-xgboostserver:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
+  related-image-xgboostserver-v2:
+    type: string
+    default: ''
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   use-executor:
     type: boolean
     default: true
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
   watch-namespace:
     type: string
     default: ''
-    description: https://docs.seldon.io/projects/seldon-core/en/v1.14.0/reference/helm.html
+    description: https://docs.seldon.io/projects/seldon-core/en/latest/nav/reference.html
