@@ -86,11 +86,24 @@ class SeldonCoreOperator(CharmBase):
         self._name = self.model.app.name
         self._metrics_port = self.model.config["metrics-port"]
         self._webhook_port = self.model.config["webhook-port"]
+        self._manager_create_resources = self.model.config["manager-create-resources"]
+        self._manager_log_level = self.model.config["manager-log-level"]
+        self._manager_leader_election_id = self.model.config["manager-leader-election-id"]
+        self._manager_leader_election_resource_lock = self.model.config["manager-leader-election-resource-lock"]
+        self._manager_leader_election_lease_duration_secs = self.model.config["manager-leader-election-lease-duration-secs"]
+        self._manager_leader_election_renew_deadline_secs = self.model.config["manager-leader-election-renew-deadline-secs"]
+        self._manager_leader_election_retry_period_secs = self.model.config["manager-leader-election-retry-period-secs"]
         self._exec_command = (
             "/manager "
             "--enable-leader-election "
             f"--metrics-addr=:{self._metrics_port} "
             f"--webhook-port {self._webhook_port} "
+            f"--log-level={self._manager_log_level} "
+            f"--leader-election-id={self._manager_leader_election_id} "
+            f"--leader-election-resource-lock={self._manager_leader_election_resource_lock} "
+            f"--leader-election-lease-duration-secs={self._manager_leader_election_lease_duration_secs} "
+            f"--leader-election-renew-deadline-secs={self._manager_leader_election_renew_deadline_secs} "
+            f"--leader-election-retry-period-secs={self._manager_leader_election_retry_period_secs} "
         )
         self._container_name = "seldon-core"
         self._container = self.unit.get_container(self._container_name)
@@ -216,8 +229,10 @@ class SeldonCoreOperator(CharmBase):
         ret_env_vars = {
             "AMBASSADOR_ENABLED": str(bool(self.model.relations["ambassador"])).lower(),
             "AMBASSADOR_SINGLE_NAMESPACE": str(config["ambassador-single-namespace"]).lower(),
+            "AMBASSADOR_VERSION": config["ambassador-version"],
             "CONTROLLER_ID": config["controller-id"],
             "DEFAULT_USER_ID": config["default-user-id"],
+            "DEPLOYMENT_NAME_AS_PREFIX": str(config["deployment-name-as-prefix"]).lower(),
             "EXECUTOR_CONTAINER_IMAGE_AND_VERSION": config["executor-container-image-and-version"],
             "EXECUTOR_CONTAINER_IMAGE_PULL_POLICY": config["executor-container-image-pull-policy"],
             "EXECUTOR_CONTAINER_SERVICE_ACCOUNT_NAME": config[
@@ -228,32 +243,46 @@ class SeldonCoreOperator(CharmBase):
             "EXECUTOR_DEFAULT_CPU_REQUEST": config["executor-default-cpu-request"],
             "EXECUTOR_DEFAULT_MEMORY_LIMIT": config["executor-default-memory-limit"],
             "EXECUTOR_DEFAULT_MEMORY_REQUEST": config["executor-default-memory-request"],
+            "EXECUTOR_FULL_HEALTH_CHECKS": str(config["executor-full-health-checks"]).lower(),
             "EXECUTOR_PROMETHEUS_PATH": config["executor-prometheus-path"],
             "EXECUTOR_REQUEST_LOGGER_DEFAULT_ENDPOINT": config[
                 "executor-request-logger-default-endpoint"
             ],
+            "EXECUTOR_REQUEST_LOGGER_WORK_QUEUE_SIZE": config["executor-request-logger-work-queue-size"],
+            "EXECUTOR_REQUEST_LOGGER_WRITE_TIMEOUT_MS": config["executor-request-logger-write-timeout-ms"],
             "EXECUTOR_SERVER_METRICS_PORT_NAME": config["executor-server-metrics-port-name"],
             "EXECUTOR_SERVER_PORT": config["executor-server-port"],
             "ISTIO_ENABLED": str(bool(self.model.relations["gateway-info"])).lower(),
             "ISTIO_GATEWAY": istio_gateway,
             "ISTIO_TLS_MODE": config["istio-tls-mode"],
             "KEDA_ENABLED": str(bool(self.model.relations["keda"])).lower(),
-            "MANAGER_CREATE_RESOURCES": "true",
+            "MANAGER_CREATE_RESOURCES": str(config["manager-create-resources"]).lower(),
+            "MANAGER_LOG_LEVEL": config["manager-log-level"],
+            "MANAGER_LEADER_ELECTION_ID": config["manager-leader-election-id"],
+            "MANAGER_LEADER_ELECTION_RESOURCE_LOCK": config["manager-leader-election-resource-lock"],
+            "MANAGER_LEADER_ELECTION_LEASE_DURATION_SECS": config["manager-leader-election-lease-duration-secs"],
+            "MANAGER_LEADER_ELECTION_RENEW_DEADLINE_SECS": config["manager-leader-election-renew-deadline-secs"],
+            "MANAGER_LEADER_ELECTION_RETRY_PERIOD_SECS": config["manager-leader-election-retry-period-secs"],
             "POD_NAMESPACE": self.model.name,
             "PREDICTIVE_UNIT_DEFAULT_ENV_SECRET_REF_NAME": config[
                 "predictive-unit-default-env-secret-ref-name"
             ],
+            "PREDICTIVE_UNIT_GRPC_SERVICE_PORT": config["predictive-unit-grpc-service-port"],
+            "PREDICTIVE_UNIT_HTTP_SERVICE_PORT": config["predictive-unit-http-service-port"],
             "PREDICTIVE_UNIT_METRICS_PORT_NAME": config["predictive-unit-metrics-port-name"],
-            "PREDICTIVE_UNIT_SERVICE_PORT": config["predictive-unit-service-port"],
             "RELATED_IMAGE_EXECUTOR": config["related-image-executor"],
             "RELATED_IMAGE_EXPLAINER": config["related-image-explainer"],
+            "RELATED_IMAGE_EXPLAINER_V2": config["related-image-explainer-v2"],
             "RELATED_IMAGE_MLFLOWSERVER": config["related-image-mlflowserver"],
+            "RELATED_IMAGE_MLFLOWSERVER_V2": config["related-image-mlflowserver-v2"],
             "RELATED_IMAGE_MOCK_CLASSIFIER": config["related-image-mock-classifier"],
             "RELATED_IMAGE_SKLEARNSERVER": config["related-image-sklearnserver"],
+            "RELATED_IMAGE_SKLEARNSERVER_V2": config["related-image-sklearnserver-v2"],
             "RELATED_IMAGE_STORAGE_INITIALIZER": config["related-image-storage-initializer"],
             "RELATED_IMAGE_TENSORFLOW": config["related-image-tensorflow"],
             "RELATED_IMAGE_TFPROXY": config["related-image-tfproxy"],
             "RELATED_IMAGE_XGBOOSTSERVER": config["related-image-xgboostserver"],
+            "RELATED_IMAGE_XGBOOSTSERVER_V2": config["related-image-xgboostserver-v2"],
             "USE_EXECUTOR": str(config["use-executor"]).lower(),
             "WATCH_NAMESPACE": config["watch-namespace"],
         }
