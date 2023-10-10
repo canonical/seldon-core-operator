@@ -35,6 +35,7 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
     verbs=None,
 )
 TEST_LABEL = {"testing-seldon-deployments": "true"}
+WORKLOADS_NAMESPACE = "default"
 
 
 @pytest.fixture(scope="session")
@@ -47,7 +48,7 @@ def lightkube_client() -> Client:
 @pytest.fixture(scope="module")
 def patch_namespace_with_seldon_label(lightkube_client: Client, ops_test: OpsTest):
     """Patch the current namespace with Seldon specific labels."""
-    this_ns = lightkube_client.get(res=Namespace, name=ops_test.model_name)
+    this_ns = lightkube_client.get(res=Namespace, name=WORKLOADS_NAMESPACE)
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     lightkube_client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
@@ -58,7 +59,9 @@ def remove_seldon_deployment(lightkube_client: Client, ops_test: OpsTest):
     yield
 
     # remove Seldon Deployment
-    namespace = ops_test.model_name
+    # Use namespace "default" to create seldon deployments
+    # due to https://github.com/canonical/seldon-core-operator/issues/218
+    namespace = WORKLOADS_NAMESPACE
     resource_to_delete = lightkube_client.list(
         SELDON_DEPLOYMENT, namespace=namespace, labels=TEST_LABEL
     )
@@ -274,7 +277,9 @@ async def test_seldon_predictor_server(
     Workload deploys Seldon predictor servers defined in ConfigMap.
     Each server is deployed and inference request is triggered, and response is evaluated.
     """
-    namespace = ops_test.model_name
+    # Use namespace "default" to create seldon deployments
+    # due to https://github.com/canonical/seldon-core-operator/issues/218
+    namespace = WORKLOADS_NAMESPACE
     # retrieve predictor server information and create Seldon Depoloyment
     with open(f"tests/assets/crs/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
