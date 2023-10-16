@@ -65,7 +65,10 @@ Taking into account issue [#222](https://github.com/canonical/seldon-core-operat
 1. In a clean cluster, apply upstream KF manifests using `kustomize build seldon-core-operator/base | kubectl apply -n kubeflow -f -` from the [kubeflow/manifests/contrib/seldon](https://github.com/kubeflow/manifests/tree/master/contrib/seldon) directory.
 1. Check what resources have been created in the cluster (verify those by looking in the [initializer function](https://github.com/SeldonIO/seldon-core/blob/master/operator/utils/k8s/initializer.go#L46))
 1. Go ahead and update our manifests accordingly
+
 Do not forget to follow also the standard process (described in the Release Handbook) by doing `diff` between old and new version KF manifests for other manifests apart from those resources, like `auth_manifests`.
+
+Note that, as with all sidecar charms, we do not include the `deployment` resource in our manifests since Pebble is responsible for creating the workload container in our case. However, we should consult any changes in the deployment that affect the container (e.g. its environment or command agruments).
 
 ## Canonical Contributor Agreement
 
