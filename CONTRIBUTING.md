@@ -68,7 +68,7 @@ Taking into account issue [#222](https://github.com/canonical/seldon-core-operat
 
 Do not forget to follow also the standard process (described in the Release Handbook) by doing `diff` between old and new version KF manifests for other manifests apart from those resources, like `auth_manifests`.
 
-Note that, as with all sidecar charms, we do not include the `deployment` resource in our manifests since Pebble is responsible for creating the workload container in our case. However, we should consult any changes in the deployment that affect the container (e.g. its environment or command agruments).
+Note that, as with all sidecar charms, we do not include the `deployment` resource in our manifests since Pebble is responsible for creating the workload container in our case. However, we should consult any changes in the deployment that affect the container (e.g. its environment or command arguments).
 
 ## Canonical Contributor Agreement
 
