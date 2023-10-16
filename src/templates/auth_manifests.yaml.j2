@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: leader-election-role
+  name: seldon-leader-election-role
   namespace: {{ namespace }}
 rules:
 - apiGroups:
@@ -49,11 +49,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: leader-election-rolebinding
+  name: seldon-leader-election-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: leader-election-role
+  name: seldon-leader-election-role
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
@@ -63,7 +63,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: seldon-manager-role
 rules:
 - apiGroups:
   - ""
@@ -324,11 +324,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: manager-rolebinding
+  name: seldon-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: manager-role
+  name: seldon-manager-role
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
@@ -339,7 +339,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-sas-role
+  name: seldon-manager-sas-role
 rules:
 - apiGroups:
   - ""
@@ -369,11 +369,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: manager-sas-rolebinding
+  name: seldon-manager-sas-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: manager-sas-role
+  name: seldon-manager-sas-role
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
@@ -403,7 +403,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: webhook-role
+  name: seldon-webhook-role
 rules:
 - apiGroups:
   - admissionregistration.k8s.io
@@ -444,11 +444,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: webhook-rolebinding
+  name: seldon-webhook-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: webhook-role
+  name: seldon-webhook-role
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
