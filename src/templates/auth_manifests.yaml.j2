@@ -63,7 +63,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: seldon-manager-role
+  name: seldon-manager-role-kubeflow
 rules:
 - apiGroups:
   - ""
@@ -324,11 +324,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: seldon-manager-rolebinding
+  name: seldon-manager-rolebinding-kubeflow
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: seldon-manager-role
+  name: seldon-manager-role-kubeflow
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
@@ -339,7 +339,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: seldon-manager-sas-role
+  name: seldon-manager-sas-role-kubeflow
 rules:
 - apiGroups:
   - ""
@@ -369,11 +369,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: seldon-manager-sas-rolebinding
+  name: seldon-manager-sas-rolebinding-kubeflow
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: seldon-manager-sas-role
+  name: seldon-manager-sas-role-kubeflow
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
@@ -403,7 +403,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: seldon-webhook-role
+  name: seldon-webhook-role-kubeflow
 rules:
 - apiGroups:
   - admissionregistration.k8s.io
@@ -444,11 +444,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: seldon-webhook-rolebinding
+  name: seldon-webhook-rolebinding-kubeflow
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: seldon-webhook-role
+  name: seldon-webhook-role-kubeflow
 subjects:
 - kind: ServiceAccount
   name: {{ app_name }}
