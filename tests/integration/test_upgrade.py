@@ -51,7 +51,7 @@ async def test_upgrade(ops_test: OpsTest):
 
     # deploy stable version of the charm
     await ops_test.model.deploy(
-        entity_url="seldon-core", application_name=APP_NAME, channel="1.14/stable", trust=True
+        entity_url="seldon-core", application_name=APP_NAME, channel="1.15/stable", trust=True
     )
 
     # wait for application to be idle for 60 seconds, because seldon-core workload creates an empty
