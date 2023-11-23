@@ -41,7 +41,7 @@ WORKLOADS_NAMESPACE = "default"
 @pytest.fixture(scope="session")
 def lightkube_client() -> Client:
     """Return an instantiated lightkube client to use during the session."""
-    lightkube_client = Client(field_manager="seldon-tests")
+    lightkube_client = Client(field_manager="seldon-tests", trust_env=False)
     return lightkube_client
 
 

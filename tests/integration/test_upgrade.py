@@ -77,7 +77,7 @@ async def test_upgrade(ops_test: OpsTest):
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
     # verify that cluster CRD is installed
-    lightkube_client = Client()
+    lightkube_client = Client(trust_env=False)
     try:
         cluster_crd = lightkube_client.get(
             CustomResourceDefinition,

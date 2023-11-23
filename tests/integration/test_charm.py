@@ -45,7 +45,7 @@ with open("tests/integration/test_data/expected_changed_seldon_cm.json", "r") as
 
 @pytest.fixture(scope="session")
 def lightkube_client() -> Client:
-    client = Client(field_manager=APP_NAME)
+    client = Client(field_manager=APP_NAME, trust_env=False)
     return client
 
 
@@ -172,7 +172,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     # Use namespace "default" to create seldon deployments
     # due to https://github.com/canonical/seldon-core-operator/issues/218
     namespace = WORKLOADS_NAMESPACE
-    client = Client()
+    client = Client(trust_env=False)
 
     # setup Prometheus
     prometheus = "prometheus-k8s"
@@ -285,7 +285,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     # Use namespace "default" to create seldon deployments
     # due to https://github.com/canonical/seldon-core-operator/issues/218
     namespace = WORKLOADS_NAMESPACE
-    client = Client()
+    client = Client(trust_env=False)
 
     this_ns = client.get(res=Namespace, name=namespace)
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
@@ -334,7 +334,7 @@ async def test_remove_with_resources_present(ops_test: OpsTest):
 
     Verify that all deployed resources that need to be removed are removed.
     """
-    lightkube_client = Client()
+    lightkube_client = Client(trust_env=False)
 
     # remove deployed charm and verify that it is removed
     await ops_test.model.remove_application(APP_NAME, block_until_done=True)
