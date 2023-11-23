@@ -45,36 +45,52 @@ jobs:
 
   integration:
     name: Integration Test (build and deploy)
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, X64, two-xlarge]
     strategy:
       matrix:
         tox-environments:
           - charm-integration
           - seldon-servers-integration
     steps:
-    # Ideally we'd use self-hosted runners, but this effort is still not stable.
-    # This action will remove unused software (dotnet, haskell, android libs, codeql,
-    # and docker images) from the GH runner, which will liberate around 60 GB of storage
-    # distributed in 40GB for root and around 20 for a mnt point.
-    - name: Maximise GH runner space
-      uses: easimon/maximize-build-space@v8
-      with:
-        root-reserve-mb: 40960
-        remove-dotnet: 'true'
-        remove-haskell: 'true'
-        remove-android: 'true'
-        remove-codeql: 'true'
-        remove-docker-images: 'true'
-
     - name: Check out repo
       uses: actions/checkout@v2
+
+    - name: Parse and enable DNS server
+      id: dns-name
+      run: |
+        dns_server=$(grep -oPm1 'Current DNS Server: \K[^\s]+' <<< "$(resolvectl status)")
+        echo "Using following DNS Server: $dns_server"
+
+        echo "MY_ADDONS=hostpath-storage ingress dns:$dns_server rbac registry metallb:'10.64.140.43-10.64.140.49,192.168.0.105-192.168.0.111'" >> $GITHUB_OUTPUT
+
+    - name: Setup aproxy
+      run: |
+        sudo snap install aproxy --edge
+        sudo snap set aproxy proxy=squid.internal:3128
+        sudo nft -f - << EOF
+        define default-ip = $(ip route get $(ip route show 0.0.0.0/0 | grep -oP 'via \K\S+') | grep -oP 'src \K\S+')
+        define private-ips = { 10.0.0.0/8, 127.0.0.1/8, 172.16.0.0/12, 192.168.0.0/16 }
+        table ip aproxy
+        flush table ip aproxy
+        table ip aproxy {
+              chain prerouting {
+                      type nat hook prerouting priority dstnat; policy accept;
+                      ip daddr != \$private-ips tcp dport { 80, 443 } counter dnat to \$default-ip:8443
+              }
+
+              chain output {
+                      type nat hook output priority -100; policy accept;
+                      ip daddr != \$private-ips tcp dport { 80, 443 } counter dnat to \$default-ip:8443
+              }
+        }
+        EOF
 
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
       with:
         provider: microk8s
         channel: 1.25-strict/stable
-        microk8s-addons: "dns hostpath-storage rbac metallb:10.64.140.43-10.64.140.49"
+        microk8s-addons: ${{ steps.dns-name.outputs.MY_ADDONS }}
         juju-channel: 3.1/stable
         charmcraft-channel: latest/candidate
 
