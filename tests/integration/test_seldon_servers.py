@@ -58,21 +58,6 @@ def remove_seldon_deployment(lightkube_client: Client, ops_test: OpsTest):
     """Remove SeldonDeployment even if the test case fails."""
     yield
 
-    # remove Seldon Deployment
-    # Use namespace "default" to create seldon deployments
-    # due to https://github.com/canonical/seldon-core-operator/issues/218
-    namespace = WORKLOADS_NAMESPACE
-    resource_to_delete = lightkube_client.list(
-        SELDON_DEPLOYMENT, namespace=namespace, labels=TEST_LABEL
-    )
-    for obj in resource_to_delete:
-        lightkube_client.delete(
-            SELDON_DEPLOYMENT, name=obj.metadata.name, namespace=namespace, grace_period=0
-        )
-        utils.assert_deleted(
-            logger, lightkube_client, SELDON_DEPLOYMENT, obj.metadata.name, namespace=namespace
-        )
-
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
@@ -269,7 +254,6 @@ async def test_seldon_predictor_server(
     request_data,
     response_test_data,
     lightkube_client,
-    remove_seldon_deployment,
     ops_test: OpsTest,
     patch_namespace_with_seldon_label,
 ):
