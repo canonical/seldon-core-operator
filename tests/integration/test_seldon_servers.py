@@ -260,6 +260,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         ),
     ],
 )
+@pytest.mark.abort_on_fail
 @pytest.mark.asyncio
 async def test_seldon_predictor_server(
     server_name,
