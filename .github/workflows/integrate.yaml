@@ -138,6 +138,9 @@ jobs:
       run: kubectl get seldondeployments -A -o yaml
       if: failure()
 
+    - name: Get logs from pods in `default` namespace
+      run: kubectl get pods -n default | tail -n +2 | awk '{print $1}' | xargs -n1 kubectl -n default logs --all-containers
+
     - name: Get juju status
       run: juju status
       if: failure()
