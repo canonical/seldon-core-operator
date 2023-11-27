@@ -14,7 +14,7 @@ SELDON_SERVERS = [
             # classifier will be replaced according to configmap
             "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
         },
-        id="sklearn-v1"
+        id="sklearn-v1",
     ),
     param(
         "SKLEARN_SERVER",
@@ -45,7 +45,7 @@ SELDON_SERVERS = [
                 }
             ],
         },
-        id="sklearn-v2"
+        id="sklearn-v2",
     ),
     param(
         "XGBOOST_SERVER",
@@ -60,7 +60,7 @@ SELDON_SERVERS = [
             # classifier will be replaced according to configmap
             "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
         },
-        id="xgboost-v1"
+        id="xgboost-v1",
     ),
     param(
         "XGBOOST_SERVER",
@@ -91,7 +91,7 @@ SELDON_SERVERS = [
                 }
             ],
         },
-        id="xgboost-v2"
+        id="xgboost-v2",
     ),
     param(
         "MLFLOW_SERVER",
@@ -106,7 +106,7 @@ SELDON_SERVERS = [
             # classifier will be replaced according to configmap
             "meta": {"requestPath": {"classifier": "IMAGE:VERSION"}},
         },
-        id="mlflowserver-v1"
+        id="mlflowserver-v1",
     ),
     param(
         "MLFLOW_SERVER",
@@ -114,7 +114,7 @@ SELDON_SERVERS = [
         "v2/models/classifier/infer",
         "mlflowserver-request-data.json",
         "mlflowserver-response-data.json",
-        id="mlflowserver-v2"
+        id="mlflowserver-v2",
     ),
     param(
         "TENSORFLOW_SERVER",
@@ -122,7 +122,7 @@ SELDON_SERVERS = [
         "api/v1.0/predictions",
         "tensorflow-serving-request-data.json",
         "tensorflow-serving-response-data.json",
-        id="tf-serving"
+        id="tf-serving",
     ),
     param(
         "TENSORFLOW_SERVER",
@@ -130,7 +130,7 @@ SELDON_SERVERS = [
         "v1/models/classifier:predict",
         {"instances": [1.0, 2.0, 5.0]},
         {"predictions": [2.5, 3, 4.5]},
-        id="tensorflow"
+        id="tensorflow",
     ),
     param(
         "HUGGINGFACE_SERVER",
@@ -162,6 +162,6 @@ SELDON_SERVERS = [
                 }
             ],
         },
-        id="huggingface"
+        id="huggingface",
     ),
 ]
