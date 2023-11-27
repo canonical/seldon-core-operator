@@ -49,8 +49,16 @@ jobs:
     strategy:
       matrix:
         tox-environments:
-          - charm-integration
-          - seldon-servers-integration
+          - charm-integration -- --model testing
+          - seldon-servers-integration -- --model testing -k sklearn-v1
+          - seldon-servers-integration -- --model testing -k sklearn-v2
+          - seldon-servers-integration -- --model testing -k xgboost-v1
+          - seldon-servers-integration -- --model testing -k xgboost-v2
+          - seldon-servers-integration -- --model testing -k mlflowserver-v1
+          - seldon-servers-integration -- --model testing -k mlflowserver-v2
+          - seldon-servers-integration -- --model testing -k tf-serving
+          - seldon-servers-integration -- --model testing -k tensorflow
+          - seldon-servers-integration -- --model testing -k huggingface
     steps:
     # Ideally we'd use self-hosted runners, but this effort is still not stable.
     # This action will remove unused software (dotnet, haskell, android libs, codeql,
@@ -79,7 +87,7 @@ jobs:
         charmcraft-channel: latest/candidate
 
     - name: Run integration tests
-      run: tox -ve ${{ matrix.tox-environments }} -- --model testing
+      run: tox -ve ${{ matrix.tox-environments }}
 
     # On failure, capture debugging resources
     - name: Get all
