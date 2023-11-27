@@ -106,6 +106,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
     "server_name, server_config, url, request_data, response_test_data",
     SELDON_SERVERS,
 )
+@pytest.mark.abort_on_fail
 @pytest.mark.asyncio
 async def test_seldon_predictor_server(
     server_name,
