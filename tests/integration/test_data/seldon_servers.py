@@ -3,7 +3,7 @@ from pytest import param
 SELDON_SERVERS = [
     param(
         "SKLEARN_SERVER",
-        "sklearn.yaml",
+        "sklearn-v1.yaml",
         "api/v1.0/predictions",
         {"data": {"ndarray": [[1, 2, 3, 4]]}},
         {
@@ -49,7 +49,7 @@ SELDON_SERVERS = [
     ),
     param(
         "XGBOOST_SERVER",
-        "xgboost.yaml",
+        "xgboost-v1.yaml",
         "api/v1.0/predictions",
         {"data": {"ndarray": [[1.0, 2.0, 5.0, 6.0]]}},
         {
@@ -95,7 +95,7 @@ SELDON_SERVERS = [
     ),
     param(
         "MLFLOW_SERVER",
-        "mlflowserver.yaml",
+        "mlflowserver-v1.yaml",
         "api/v1.0/predictions",
         {"data": {"ndarray": [[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1]]}},
         {
@@ -118,7 +118,7 @@ SELDON_SERVERS = [
     ),
     param(
         "TENSORFLOW_SERVER",
-        "tensorflow-serving.yaml",
+        "tf-serving.yaml",
         "api/v1.0/predictions",
         "tensorflow-serving-request-data.json",
         "tensorflow-serving-response-data.json",
