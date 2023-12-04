@@ -43,22 +43,25 @@ jobs:
     - name: Run unit tests
       run: tox -e unit
 
+  get-integration-environments:
+    name: Get integration environments
+    runs-on: ubuntu-20.04
+    outputs:
+      environments: ${{ steps.script.outputs.environments }}
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v3
+      - name: Run get-intergration-environements.py
+        id: script
+        run: python ./tools/get-integration-environments.py
+
   integration:
     name: Integration Test (build and deploy)
+    needs: get-integration-environments
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        tox-environments:
-          - charm-integration -- --model testing
-          - seldon-servers-integration -- --model testing -k sklearn-v1
-          - seldon-servers-integration -- --model testing -k sklearn-v2
-          - seldon-servers-integration -- --model testing -k xgboost-v1
-          - seldon-servers-integration -- --model testing -k xgboost-v2
-          - seldon-servers-integration -- --model testing -k mlflowserver-v1
-          - seldon-servers-integration -- --model testing -k mlflowserver-v2
-          - seldon-servers-integration -- --model testing -k tf-serving
-          - seldon-servers-integration -- --model testing -k tensorflow
-          - seldon-servers-integration -- --model testing -k huggingface
+        tox-environments: ${{ fromJson(needs.get-integration-environments.outputs.environments) }}
     steps:
     # Ideally we'd use self-hosted runners, but this effort is still not stable.
     # This action will remove unused software (dotnet, haskell, android libs, codeql,
@@ -87,7 +90,7 @@ jobs:
         charmcraft-channel: latest/candidate
 
     - name: Run integration tests
-      run: tox -ve ${{ matrix.tox-environments }}
+      run: tox -ve ${{ matrix.tox-environments }} --model testing
 
     # On failure, capture debugging resources
     - name: Get all
