@@ -10,10 +10,6 @@ spec:
       memory: "64Mi"
       cpu: "250m"
       ephemeral-storage: "2G"
-    limits:
-      memory: "128Mi"
-      cpu: "250m"
-      ephemeral-storage: "2G"
   predictors:
     - graph:
         children: []

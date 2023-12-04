@@ -240,7 +240,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
 
     # simulate scenario where alert will fire
     # create SeldonDeployment
-    with open("tests/assets/crs/serve-simple-v1.yaml") as f:
+    with open("tests/assets/crs/test-charm/serve-simple-v1.yaml") as f:
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         sdep["metadata"]["name"] = "seldon-model-1"
         client.create(sdep, namespace=namespace)
@@ -291,7 +291,7 @@ async def test_seldon_deployment(ops_test: OpsTest):
     this_ns.metadata.labels.update({"serving.kubeflow.org/inferenceservice": "enabled"})
     client.patch(res=Namespace, name=this_ns.metadata.name, obj=this_ns)
 
-    with open("tests/assets/crs/serve-simple-v1.yaml") as f:
+    with open("tests/assets/crs/test-charm/serve-simple-v1.yaml") as f:
         sdep = SELDON_DEPLOYMENT(yaml.safe_load(f.read()))
         client.create(sdep, namespace=namespace)
 
