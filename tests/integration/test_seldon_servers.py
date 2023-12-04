@@ -128,7 +128,7 @@ async def test_seldon_predictor_server(
     # due to https://github.com/canonical/seldon-core-operator/issues/218
     namespace = WORKLOADS_NAMESPACE
     # retrieve predictor server information and create Seldon Depoloyment
-    with open(f"tests/assets/crs/{server_config}") as f:
+    with open(f"tests/assets/crs/test=seldon-servers/{server_config}") as f:
         deploy_yaml = yaml.safe_load(f.read())
         ml_model = deploy_yaml["metadata"]["name"]
         predictor = deploy_yaml["spec"]["predictors"][0]["name"]
