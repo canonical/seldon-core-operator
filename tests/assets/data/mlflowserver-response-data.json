@@ -2,15 +2,20 @@
     "model_name": "classifier",
     "model_version": "v1",
     "id": "None",
-    "parameters": null,
+    "parameters": {
+        "content_type": "np"
+    },
     "outputs": [
         {
-            "name": "predict",
+            "name": "output-1",
             "shape": [
+                1,
                 1
             ],
             "datatype": "FP64",
-            "parameters": null,
+            "parameters": {
+                "content_type": "np"
+            },
             "data": [
                 6.016145744177844
             ]
