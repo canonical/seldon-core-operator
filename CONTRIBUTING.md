@@ -48,6 +48,35 @@ tox -e lint
 
 See `tox.ini` for all available environments.
 
+#### Seldon server integration tests
+
+`test_seldon_servers.py` test ensures that SeldonDeployments CRs can be deployed successfully. The test initially deploys the charm and then applies the SeldonDeployment CRs defined under `assets/crs` directory.
+
+* **Test all SeldonDeployment at once**: In order to test all SeldonDeployments at once, deploying the charm once, and then all the CRs consecutively (deploying one and once test succeeds, deleting it) use the `seldon-servers-integration` environment like this
+```
+# -- --model testing is optional in order to the charm to deployed to model `testing`
+tox -e seldon-servers-integration -- --model testing
+```
+
+* **Test one server at a time**: In order to test only one SeldonDeployment each time, use the `seldon-servers-integration` environment with `pytest` flag `-k`, alongside the CR's corresponding keyword e.g.
+```
+# --model testing is optional in order to the charm to deployed to model `testing`
+tox -e seldon-servers-integration -- -k sklearn-v1 --model testing
+```
+The available keywords are:
+```
+sklearn-v1
+sklearn-v2
+xgboost-v1
+xgboost-v2
+mlflowserver-v1
+mlflowserver-v2
+tf-serving
+tensorflow
+huggingface
+```
+These derive from the `id` field of objects in the `seldon_servers.py` file.
+
 ### Deploy
 
 ```bash
