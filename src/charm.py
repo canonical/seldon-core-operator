@@ -64,6 +64,8 @@ SPLIT_IMAGES_LIST = [
     "configmap__predictor__tempo_server__v2",
 ]
 DEFAULT_IMAGES_FILE = "src/default-custom-images.json"
+METRICS_PATH = "/metrics"
+METRICS_PORT = "8080"
 
 with open(DEFAULT_IMAGES_FILE, "r") as json_file:
     DEFAULT_IMAGES = json.load(json_file)
@@ -84,7 +86,6 @@ class SeldonCoreOperator(CharmBase):
         self._namespace = self.model.name
         self._lightkube_field_manager = "lightkube"
         self._name = self.model.app.name
-        self._metrics_port = self.model.config["metrics-port"]
         self._webhook_port = self.model.config["webhook-port"]
         self._manager_create_resources = self.model.config["manager-create-resources"]
         self._manager_log_level = self.model.config["manager-log-level"]
@@ -104,7 +105,7 @@ class SeldonCoreOperator(CharmBase):
         self._exec_command = (
             "/manager "
             "--enable-leader-election "
-            f"--metrics-addr=:{self._metrics_port} "
+            f"--metrics-addr=:{METRICS_PORT} "
             f"--webhook-port {self._webhook_port} "
             f"--log-level={self._manager_log_level} "
             f"--leader-election-id={self._manager_leader_election_id} "
@@ -131,12 +132,30 @@ class SeldonCoreOperator(CharmBase):
         self._crd_resource_handler = None
         self._configmap_resource_handler = None
 
-        metrics_port = ServicePort(int(self._metrics_port), name="metrics-port")
+        metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
         webhook_port = ServicePort(int(self._webhook_port), name="webhook-port")
         self.service_patcher = KubernetesServicePatch(
             self,
             [metrics_port, webhook_port],
             service_name=f"{self.model.app.name}",
+        )
+
+        # Prometheus related config
+        self.prometheus_provider = MetricsEndpointProvider(
+            charm=self,
+            relation_name="metrics-endpoint",
+            jobs=[
+                {
+                    "metrics_path": METRICS_PATH,
+                    "static_configs": [{"targets": ["*:{}".format(METRICS_PORT)]}],
+                }
+            ],
+        )
+
+        # Dashboard related config (Grafana)
+        self.dashboard_provider = GrafanaDashboardProvider(
+            charm=self,
+            relation_name="grafana-dashboard",
         )
 
         # setup events to be handled by main event handler
@@ -150,25 +169,6 @@ class SeldonCoreOperator(CharmBase):
         self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.stop, self._on_stop)
-
-        # Prometheus related config
-        self.prometheus_provider = MetricsEndpointProvider(
-            charm=self,
-            relation_name="metrics-endpoint",
-            jobs=[
-                {
-                    "metrics_path": self.config["executor-server-metrics-port-name"],
-                    "static_configs": [{"targets": ["*:{}".format(self.config["metrics-port"])]}],
-                }
-            ],
-            lookaside_jobs_callable=self.return_list_of_running_models,
-        )
-
-        # Dashboard related config (Grafana)
-        self.dashboard_provider = GrafanaDashboardProvider(
-            charm=self,
-            relation_name="grafana-dashboard",
-        )
 
     @property
     def container(self):
