@@ -13,7 +13,7 @@ from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.testing import Harness
 
-from charm import SeldonCoreOperator
+from charm import METRICS_PORT, SeldonCoreOperator
 
 SELDON_CM_NAME = "seldon-config"
 
@@ -181,7 +181,7 @@ class TestCharm:
         assert (
             pebble_plan_info["services"]["seldon-core"]["command"] == "/manager "
             "--enable-leader-election "
-            f"--metrics-addr=:{harness.charm._metrics_port} "
+            f"--metrics-addr=:{METRICS_PORT} "
             f"--webhook-port {harness.charm._webhook_port} "
             f"--log-level={harness.charm._manager_log_level} "
             f"--leader-election-id={harness.charm._manager_leader_election_id} "

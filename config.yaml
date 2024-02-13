@@ -1,8 +1,4 @@
 options:
-  metrics-port:
-    type: string
-    default: '8080'
-    description: Metrics port
   webhook-port:
     type: string
     default: '4443'
