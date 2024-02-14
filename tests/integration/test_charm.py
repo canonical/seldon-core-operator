@@ -197,6 +197,12 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     discovered_labels = targets_result["data"]["activeTargets"][0]["discoveredLabels"]
     assert discovered_labels["juju_application"] == "seldon-controller-manager"
 
+    # query for the up metric and assert the unit is available
+    up_query_response = await fetch_url(
+        f'http://{prometheus_url}:9090/api/v1/query?query=up{{juju_application="{APP_NAME}"}}'
+    )
+    assert up_query_response["data"]["result"][0]["value"][1] == "1"
+
     # obtain alert rules from Prometheus
     rules_url = f"http://{prometheus_url}:9090/api/v1/rules"
     alert_rules_result = await fetch_url(rules_url)
