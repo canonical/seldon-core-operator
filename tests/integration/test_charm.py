@@ -164,6 +164,20 @@ async def check_alert_propagation(url, alert_name):
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
 
+@tenacity.retry(wait=tenacity.wait_fixed(30), stop=tenacity.stop_after_attempt(6), reraise=True)
+async def assert_seldon_unit_is_available(prometheus_url):
+    """Assert the unit is available.
+
+    This will be tried multiple times to avoid raising errors when prometheus-k8s
+    is not in an Active status.
+    """
+    # query for the up metric and assert the unit is available
+    up_query_response = await fetch_url(
+        f'http://{prometheus_url}:9090/api/v1/query?query=up{{juju_application="{APP_NAME}"}}'
+    )
+    assert up_query_response["data"]["result"][0]["value"][1] == "1"
+
+
 @pytest.mark.abort_on_fail
 @pytest.mark.asyncio
 async def test_seldon_alert_rules(ops_test: OpsTest):
@@ -197,12 +211,6 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     discovered_labels = targets_result["data"]["activeTargets"][0]["discoveredLabels"]
     assert discovered_labels["juju_application"] == "seldon-controller-manager"
 
-    # query for the up metric and assert the unit is available
-    up_query_response = await fetch_url(
-        f'http://{prometheus_url}:9090/api/v1/query?query=up{{juju_application="{APP_NAME}"}}'
-    )
-    assert up_query_response["data"]["result"][0]["value"][1] == "1"
-
     # obtain alert rules from Prometheus
     rules_url = f"http://{prometheus_url}:9090/api/v1/rules"
     alert_rules_result = await fetch_url(rules_url)
@@ -227,6 +235,9 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     # match alerts in the rules file
     for rule in rules:
         assert rule["name"] in rules_file_alert_names
+
+    # verify SeldonUnitIsUnavailable alert is not firing
+    await assert_seldon_unit_is_available(prometheus_url)
 
     # The following integration test is optional (experimental) and might not be functioning
     # correctly under some conditions due to its reliance on timing of K8S deployments, timing of
