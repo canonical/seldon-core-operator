@@ -163,6 +163,7 @@ async def check_alert_propagation(url, alert_name):
     alert_rule = next((rule for rule in alert_rules if rule["name"] == alert_name))
     assert alert_rule is not None and alert_rule["state"] == "firing"
 
+
 @tenacity.retry(wait=tenacity.wait_fixed(30), stop=tenacity.stop_after_attempt(6), reraise=True)
 async def assert_seldon_unit_is_available(prometheus_url):
     """Assert the unit is available.
@@ -175,6 +176,7 @@ async def assert_seldon_unit_is_available(prometheus_url):
         f'http://{prometheus_url}:9090/api/v1/query?query=up{{juju_application="{APP_NAME}"}}'
     )
     assert up_query_response["data"]["result"][0]["value"][1] == "1"
+
 
 @pytest.mark.abort_on_fail
 @pytest.mark.asyncio
