@@ -29,10 +29,7 @@
   "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "${prometheusds}",
-        "uid": "P19B9F3F8E2C8F6D0"
-      },
+      "datasource": "${prometheusds}",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -107,10 +104,7 @@
       "pluginVersion": "9.2.1",
       "targets": [
         {
-          "datasource": {
-            "type": "${prometheusds}",
-            "uid": "P19B9F3F8E2C8F6D0"
-          },
+          "datasource": "${prometheusds}",
           "editorMode": "builder",
           "exemplar": false,
           "expr": "controller_runtime_webhook_requests_total{webhook=\"/validate-machinelearning-seldon-io-v1-seldondeployment\", code=\"200\"}",
@@ -121,10 +115,7 @@
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "${prometheusds}",
-            "uid": "P19B9F3F8E2C8F6D0"
-          },
+          "datasource": "${prometheusds}",
           "editorMode": "builder",
           "expr": "controller_runtime_webhook_requests_total{webhook=\"/mutate-machinelearning-seldon-io-v1-seldondeployment\", code=\"500\"}",
           "hide": false,
