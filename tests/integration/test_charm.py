@@ -36,6 +36,18 @@ SELDON_DEPLOYMENT = create_namespaced_resource(
 SELDON_CM_NAME = "seldon-config"
 WORKLOADS_NAMESPACE = "default"
 
+ISTIO_CHANNEL = "1.17/stable"
+ISTIO_PILOT = "istio-pilot"
+ISTIO_PILOT_TRUST = True
+ISTIO_GATEWAY = "istio-gateway"
+ISTIO_GATEWAY_APP_NAME = "istio-ingressgateway"
+ISTIO_GATEWAY_TRUST = True
+
+PROMETHEUS_K8S = "prometheus-k8s"
+PROMETHEUS_K8S_CHANNEL = "1.0/stable"
+PROMETHEUS_K8S_TRUST = True
+
+
 with open("tests/integration/test_data/expected_seldon_cm.json", "r") as json_file:
     SELDON_CONFIG = json.load(json_file)
 
@@ -109,32 +121,30 @@ async def test_seldon_istio_relation(ops_test: OpsTest):
     # NOTE: This test is re-using deployment created in test_build_and_deploy()
 
     # setup Istio
-    istio_gateway = "istio-ingressgateway"
-    istio_pilot = "istio-pilot"
     await ops_test.model.deploy(
-        entity_url="istio-gateway",
-        application_name=istio_gateway,
-        channel="latest/edge",
+        ISTIO_GATEWAY,
+        application_name=ISTIO_GATEWAY_APP_NAME,
+        channel=ISTIO_CHANNEL,
         config={"kind": "ingress"},
-        trust=True,
+        trust=ISTIO_GATEWAY_TRUST,
     )
     await ops_test.model.deploy(
-        istio_pilot,
-        channel="latest/edge",
+        ISTIO_PILOT,
+        channel=ISTIO_CHANNEL,
         config={"default-gateway": "test-gateway"},
-        trust=True,
+        trust=ISTIO_PILOT_TRUST,
     )
-    await ops_test.model.add_relation(istio_pilot, istio_gateway)
+    await ops_test.model.add_relation(ISTIO_PILOT, ISTIO_GATEWAY_APP_NAME)
 
     await ops_test.model.wait_for_idle(
-        apps=[istio_pilot, istio_gateway],
+        apps=[ISTIO_PILOT, ISTIO_GATEWAY_APP_NAME],
         status="active",
         raise_on_blocked=False,
         timeout=60 * 20,
     )
 
     # add Seldon/Istio relation
-    await ops_test.model.add_relation(f"{istio_pilot}:gateway-info", f"{APP_NAME}:gateway-info")
+    await ops_test.model.add_relation(f"{ISTIO_PILOT}:gateway-info", f"{APP_NAME}:gateway-info")
     await ops_test.model.wait_for_idle(status="active", raise_on_blocked=True, timeout=60 * 5)
 
 
@@ -189,11 +199,10 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     client = Client()
 
     # setup Prometheus
-    prometheus = "prometheus-k8s"
-    await ops_test.model.deploy(prometheus, channel="latest/stable", trust=True)
-    await ops_test.model.relate(prometheus, APP_NAME)
+    await ops_test.model.deploy(PROMETHEUS_K8S, channel=PROMETHEUS_K8S_CHANNEL, trust=PROMETHEUS_K8S_TRUST)
+    await ops_test.model.relate(PROMETHEUS_K8S, APP_NAME)
     await ops_test.model.wait_for_idle(
-        apps=[prometheus], status="active", raise_on_blocked=True, timeout=60 * 10
+        apps=[PROMETHEUS_K8S], status="active", raise_on_blocked=True, timeout=60 * 10
     )
 
     status = await ops_test.model.get_status()
