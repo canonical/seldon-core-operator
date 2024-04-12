@@ -199,7 +199,9 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     client = Client()
 
     # setup Prometheus
-    await ops_test.model.deploy(PROMETHEUS_K8S, channel=PROMETHEUS_K8S_CHANNEL, trust=PROMETHEUS_K8S_TRUST)
+    await ops_test.model.deploy(
+        PROMETHEUS_K8S, channel=PROMETHEUS_K8S_CHANNEL, trust=PROMETHEUS_K8S_TRUST
+    )
     await ops_test.model.relate(PROMETHEUS_K8S, APP_NAME)
     await ops_test.model.wait_for_idle(
         apps=[PROMETHEUS_K8S], status="active", raise_on_blocked=True, timeout=60 * 10
@@ -295,7 +297,7 @@ async def test_seldon_alert_rules(ops_test: OpsTest):
     utils.assert_deleted(logger, client, SELDON_DEPLOYMENT, "seldon-model-1", namespace)
 
     # cleanup Prometheus deployment
-    await ops_test.model.remove_application(prometheus, block_until_done=True)
+    await ops_test.model.remove_application(PROMETHEUS_K8S, block_until_done=True)
     utils.assert_deleted(logger, client, Pod, "prometheus-k8s-0", ops_test.model_name)
 
     # wait for application to settle
