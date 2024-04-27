@@ -47,7 +47,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Iterable
 
-from lightkube import Client
+from lightkube import Client  # pyright: ignore
 from lightkube.resources.core_v1 import Pod
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Object, StoredState
@@ -62,7 +62,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 7
 
 # File path where metrics endpoint change data is written for exchange
 # between the discovery process and the materialised event.
@@ -199,7 +199,7 @@ def main():
     """
     labels, run_cmd, unit, charm_dir = sys.argv[1:]
 
-    client = Client()
+    client = Client()  # pyright: ignore
     labels = json.loads(labels)
 
     for change, entity in client.watch(Pod, namespace="*", labels=labels):
@@ -208,18 +208,20 @@ def main():
             Path(PAYLOAD_FILE_PATH).unlink()
         meta = entity.metadata
         metrics_path = ""
-        if entity.metadata.annotations.get("prometheus.io/path", ""):
-            metrics_path = entity.metadata.annotations.get("prometheus.io/path", "")
+        if entity.metadata.annotations.get("prometheus.io/path", ""):  # pyright: ignore
+            metrics_path = entity.metadata.annotations.get(  # pyright: ignore
+                "prometheus.io/path", ""
+            )
 
         target_ports = []
-        for c in filter(lambda c: c.ports is not None, entity.spec.containers):
-            for p in filter(lambda p: p.name == "metrics", c.ports):
+        for c in filter(lambda c: c.ports is not None, entity.spec.containers):  # pyright: ignore
+            for p in filter(lambda p: p.name == "metrics", c.ports):  # pyright: ignore
                 target_ports.append("*:{}".format(p.containerPort))
 
         payload = {
             "change": change,
-            "namespace": meta.namespace,
-            "name": meta.name,
+            "namespace": meta.namespace,  # pyright: ignore
+            "name": meta.name,  # pyright: ignore
             "path": metrics_path,
             "targets": target_ports or ["*:80"],
         }
