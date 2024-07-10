@@ -19,6 +19,7 @@ from charmed_kubeflow_chisme.kubernetes import KubernetesResourceHandler
 from charmed_kubeflow_chisme.lightkube.batch import delete_many
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.istio_pilot.v0.istio_gateway_info import GatewayRelationError, GatewayRequirer
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError
@@ -169,6 +170,7 @@ class SeldonCoreOperator(CharmBase):
         self.framework.observe(self.on.seldon_core_pebble_ready, self._on_pebble_ready)
         self.framework.observe(self.on.remove, self._on_remove)
         self.framework.observe(self.on.stop, self._on_stop)
+        self._logging = LogForwarder(charm=self)
 
     @property
     def container(self):

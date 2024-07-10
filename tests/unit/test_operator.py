@@ -39,6 +39,22 @@ class TestCharm:
     @patch("charm.SeldonCoreOperator.k8s_resource_handler")
     @patch("charm.SeldonCoreOperator.configmap_resource_handler")
     @patch("charm.SeldonCoreOperator.crd_resource_handler")
+    def test_log_forwarding(
+        self,
+        _: MagicMock,  # k8s_resource_handler
+        __: MagicMock,  # configmap_resource_handler
+        ___: MagicMock,  # crd_resource_handler
+        harness: Harness,
+    ):
+        """Test LogForwarder initialization."""
+        with patch("charm.LogForwarder") as mock_logging:
+            harness.begin()
+            mock_logging.assert_called_once_with(charm=harness.charm)
+
+    @patch("charm.KubernetesServicePatch", lambda x, y, service_name: None)
+    @patch("charm.SeldonCoreOperator.k8s_resource_handler")
+    @patch("charm.SeldonCoreOperator.configmap_resource_handler")
+    @patch("charm.SeldonCoreOperator.crd_resource_handler")
     @patch(
         "charms.observability_libs.v0.metrics_endpoint_discovery.MetricsEndpointObserver.start_observer",
         lambda x: True,
