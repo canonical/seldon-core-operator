@@ -8,23 +8,23 @@ aiohttp==3.9.5
     # via -r requirements-integration.in
 aiosignal==1.3.1
     # via aiohttp
-anyio==4.0.0
-    # via httpcore
-asttokens==2.4.0
+anyio==4.4.0
+    # via httpx
+asttokens==2.4.1
     # via stack-data
 async-timeout==4.0.3
     # via aiohttp
-attrs==23.1.0
+attrs==23.2.0
     # via
     #   aiohttp
     #   jsonschema
 backcall==0.2.0
     # via ipython
-bcrypt==4.0.1
+bcrypt==4.1.3
     # via paramiko
-cachetools==5.3.1
+cachetools==5.3.3
     # via google-auth
-certifi==2023.7.22
+certifi==2024.7.4
     # via
     #   httpcore
     #   httpx
@@ -36,9 +36,9 @@ cffi==1.16.0
     #   pynacl
 charmed-kubeflow-chisme==0.4.2
     # via -r requirements-integration.in
-charset-normalizer==3.3.0
+charset-normalizer==3.3.2
     # via requests
-cryptography==41.0.4
+cryptography==42.0.8
     # via paramiko
 decorator==5.1.1
     # via
@@ -46,27 +46,27 @@ decorator==5.1.1
     #   ipython
 deepdiff==6.2.1
     # via charmed-kubeflow-chisme
-exceptiongroup==1.1.3
+exceptiongroup==1.2.1
     # via
     #   anyio
     #   pytest
-executing==2.0.0
+executing==2.0.1
     # via stack-data
-frozenlist==1.4.0
+frozenlist==1.4.1
     # via
     #   aiohttp
     #   aiosignal
-google-auth==2.23.3
+google-auth==2.32.0
     # via kubernetes
 h11==0.14.0
     # via httpcore
-httpcore==0.18.0
+httpcore==1.0.5
     # via httpx
-httpx==0.25.0
+httpx==0.27.0
     # via lightkube
-hvac==1.2.1
+hvac==2.3.0
     # via juju
-idna==3.4
+idna==3.7
     # via
     #   anyio
     #   httpx
@@ -82,33 +82,33 @@ ipython==8.12.3
     # via ipdb
 jedi==0.19.1
     # via ipython
-jinja2==3.1.2
+jinja2==3.1.4
     # via
     #   -r requirements-integration.in
     #   charmed-kubeflow-chisme
     #   pytest-operator
 jsonschema==4.17.3
     # via serialized-data-interface
-juju==3.2.2
+juju==3.5.0.0
     # via
     #   -r requirements-integration.in
     #   charmed-kubeflow-chisme
     #   pytest-operator
-kubernetes==28.1.0
+kubernetes==30.1.0
     # via juju
-lightkube==0.14.0
+lightkube==0.15.3
     # via
     #   -r requirements-integration.in
     #   charmed-kubeflow-chisme
-lightkube-models==1.28.1.4
+lightkube-models==1.30.0.8
     # via lightkube
-macaroonbakery==1.3.1
+macaroonbakery==1.3.4
     # via juju
-markupsafe==2.1.3
+markupsafe==2.1.5
     # via jinja2
-matplotlib-inline==0.1.6
+matplotlib-inline==0.1.7
     # via ipython
-multidict==6.0.4
+multidict==6.0.5
     # via
     #   aiohttp
     #   yarl
@@ -124,41 +124,41 @@ ops==2.14.1
     #   serialized-data-interface
 ordered-set==4.1.0
     # via deepdiff
-packaging==23.2
-    # via pytest
-paramiko==2.12.0
+packaging==24.1
+    # via
+    #   juju
+    #   pytest
+paramiko==3.4.0
     # via juju
-parso==0.8.3
+parso==0.8.4
     # via jedi
-pexpect==4.8.0
+pexpect==4.9.0
     # via ipython
 pickleshare==0.7.5
     # via ipython
 pkgutil-resolve-name==1.3.10
     # via jsonschema
-pluggy==1.3.0
+pluggy==1.5.0
     # via pytest
-prompt-toolkit==3.0.39
+prompt-toolkit==3.0.47
     # via ipython
-protobuf==3.20.3
+protobuf==5.27.2
     # via macaroonbakery
 ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.2
     # via stack-data
-pyasn1==0.5.0
+pyasn1==0.6.0
     # via
     #   juju
     #   pyasn1-modules
     #   rsa
-pyasn1-modules==0.3.0
+pyasn1-modules==0.4.0
     # via google-auth
-pycparser==2.21
+pycparser==2.22
     # via cffi
-pygments==2.16.1
+pygments==2.18.0
     # via ipython
-pyhcl==0.4.5
-    # via hvac
 pymacaroons==0.13.0
     # via macaroonbakery
 pynacl==1.5.0
@@ -172,17 +172,17 @@ pyrfc3339==1.1
     #   macaroonbakery
 pyrsistent==0.20.0
     # via jsonschema
-pytest==7.4.2
+pytest==8.2.2
     # via
     #   pytest-asyncio
     #   pytest-operator
-pytest-asyncio==0.21.1
+pytest-asyncio==0.21.2
     # via pytest-operator
-pytest-operator==0.29.0
+pytest-operator==0.35.0
     # via -r requirements-integration.in
-python-dateutil==2.8.2
+python-dateutil==2.9.0.post0
     # via kubernetes
-pytz==2023.3.post1
+pytz==2024.1
     # via pyrfc3339
 pyyaml==6.0.1
     # via
@@ -193,7 +193,7 @@ pyyaml==6.0.1
     #   ops
     #   pytest-operator
     #   serialized-data-interface
-requests==2.31.0
+requests==2.32.3
     # via
     #   -r requirements-integration.in
     #   hvac
@@ -201,7 +201,7 @@ requests==2.31.0
     #   macaroonbakery
     #   requests-oauthlib
     #   serialized-data-interface
-requests-oauthlib==1.3.1
+requests-oauthlib==2.0.0
     # via kubernetes
 rsa==4.9
     # via google-auth
@@ -216,17 +216,15 @@ six==1.16.0
     #   asttokens
     #   kubernetes
     #   macaroonbakery
-    #   paramiko
     #   pymacaroons
     #   python-dateutil
-sniffio==1.3.0
+sniffio==1.3.1
     # via
     #   anyio
-    #   httpcore
     #   httpx
 stack-data==0.6.3
     # via ipython
-tenacity==8.2.3
+tenacity==8.5.0
     # via
     #   -r requirements-integration.in
     #   charmed-kubeflow-chisme
@@ -236,29 +234,30 @@ tomli==2.0.1
     #   pytest
 toposort==1.10
     # via juju
-traitlets==5.11.2
+traitlets==5.14.3
     # via
     #   ipython
     #   matplotlib-inline
-typing-extensions==4.8.0
+typing-extensions==4.12.2
     # via
+    #   anyio
     #   ipython
     #   typing-inspect
 typing-inspect==0.9.0
     # via juju
-urllib3==1.26.18
+urllib3==2.2.2
     # via
     #   kubernetes
     #   requests
-wcwidth==0.2.8
+wcwidth==0.2.13
     # via prompt-toolkit
-websocket-client==1.6.4
+websocket-client==1.8.0
     # via
     #   kubernetes
     #   ops
 websockets==12.0
     # via juju
-yarl==1.9.2
+yarl==1.9.4
     # via aiohttp
 zipp==3.19.2
     # via importlib-resources
