@@ -26,6 +26,9 @@ requires:
   gateway-info:
     interface: istio-gateway-info
     limit: 1
+  logging:
+    interface: loki_push_api
+    optional: true
 provides:
   metrics-endpoint:
     interface: prometheus_scrape
