@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Install dependencies
       run: sudo apt-get install python3-pip tox
@@ -35,7 +35,7 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Install dependencies
       run: sudo apt-get install python3-pip tox
@@ -50,7 +50,7 @@ jobs:
       environments: ${{ steps.script.outputs.environments }}
     steps:
       - name: Checkout repository code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run get-intergration-environements.py
         id: script
         run: python ./tools/get-integration-environments.py
@@ -78,7 +78,7 @@ jobs:
         remove-docker-images: 'true'
 
     - name: Check out repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Setup operator environment
       uses: charmed-kubernetes/actions-operator@main
