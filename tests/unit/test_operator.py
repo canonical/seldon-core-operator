@@ -112,19 +112,8 @@ class TestCharm:
         harness.set_model_name("test_kubeflow")
         harness.begin()
 
-        mock_net_get = mocker.patch("ops.testing._TestingModelBackend.network_get")
         mocker.patch("ops.testing._TestingPebbleClient.list_files")
 
-        bind_address = "1.1.1.1"
-        fake_network = {
-            "bind-addresses": [
-                {
-                    "interface-name": "eth0",
-                    "addresses": [{"hostname": "cassandra-tester-0", "value": bind_address}],
-                }
-            ]
-        }
-        mock_net_get.return_value = fake_network
         rel_id = harness.add_relation("metrics-endpoint", "otherapp")
         harness.add_relation_unit(rel_id, "otherapp/0")
         harness.update_relation_data(rel_id, "otherapp", {})
