@@ -17,7 +17,7 @@ jobs:
 
   lint:
     name: Lint Check
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
@@ -31,7 +31,7 @@ jobs:
 
   unit:
     name: Unit Test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Check out code
@@ -45,7 +45,7 @@ jobs:
 
   get-integration-environments:
     name: Get integration environments
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       environments: ${{ steps.script.outputs.environments }}
     steps:
@@ -58,7 +58,7 @@ jobs:
   integration:
     name: Integration Test (build and deploy)
     needs: get-integration-environments
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         tox-environments: ${{ fromJson(needs.get-integration-environments.outputs.environments) }}
